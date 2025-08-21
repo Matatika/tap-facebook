@@ -248,7 +248,7 @@ class AdAccountsStream(FacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 25}
+        params: dict = {"limit": 100}
         if next_page_token is not None:
             params["after"] = next_page_token
 
