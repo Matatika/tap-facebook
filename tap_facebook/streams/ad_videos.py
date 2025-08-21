@@ -19,9 +19,6 @@ from singer_sdk.typing import (
 
 from tap_facebook.client import FacebookStream
 
-if t.TYPE_CHECKING:
-    from singer_sdk.helpers.types import Context, Record
-
 
 class AdVideos(FacebookStream):
     """https://developers.facebook.com/docs/marketing-api/reference/ad-image/."""
@@ -124,22 +121,23 @@ class AdVideos(FacebookStream):
     ).to_dict()
 
     def generate_child_contexts(
-            self,
-            record: Record,
-    ) -> t.Iterable[Context | None]:
-        """Generates child contexts from a given record.
+        self,
+        record: dict,
+        context: dict | None = None,
+    ) -> t.Iterable[dict]:
+        """Generate child contexts from a given record.
 
-        This method takes an input record to produce one or more child contexts.
-        The operation is aimed at further processing or analysis by organizing
-        information into separate contextual pieces.
-
-        Arguments:
-            record: A Record instance representing the data to process.
+        Args:
+            record: The parent record.
+            context: The parent context (unused here but required by SDK).
 
         Yields:
-            Context or None: Each generated child context derived from the input record.
+            dict: A child context for downstream streams.
         """
-        return {"video_id": record["id"]}
+        yield {
+        "video_id": record["id"],
+        "_current_account_id": context.get("_current_account_id") if context else None,
+    }
 
     @property
     def partitions(self) -> list[dict[str, t.Any]]:

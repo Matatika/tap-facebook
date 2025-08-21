@@ -17,9 +17,6 @@ from singer_sdk.typing import (
 from tap_facebook.client import FacebookStream
 from tap_facebook.streams.ad_videos import AdVideos
 
-if t.TYPE_CHECKING:
-    from singer_sdk.helpers.types import Context, Record
-
 
 class AdVideoThumbnails(FacebookStream):
     """https://developers.facebook.com/docs/graph-api/reference/video-thumbnail/."""
@@ -66,5 +63,4 @@ class AdVideoThumbnails(FacebookStream):
 
     def get_url(self, context: dict | None) -> str:
         version = self.config["api_version"]
-        account_id = context["_current_account_id"]
-        return f"https://graph.facebook.com/{version}/act_{account_id}/{context['video_id']}/thumbnails?fields={self.columns}"
+        return f"https://graph.facebook.com/{version}/{context['video_id']}/thumbnails?fields={self.columns}"
