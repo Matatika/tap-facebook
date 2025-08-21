@@ -1,6 +1,7 @@
 """Stream class for Creative."""
-
 from __future__ import annotations
+
+import typing as t
 
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
@@ -81,7 +82,7 @@ class CreativeStream(FacebookStream):
     ]
 
     name = "creatives"
-    path = f"/adcreatives?fields={columns}"
+    path = "adcreatives"
     tap_stream_id = "creatives"
     replication_method = REPLICATION_INCREMENTAL
     replication_key = "id"
@@ -200,3 +201,12 @@ class CreativeStream(FacebookStream):
         Property("product_set_id", StringType),
         Property("carousel_ad_link", StringType),
     ).to_dict()
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/adcreatives?fields={self.columns}"

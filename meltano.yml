@@ -18,13 +18,14 @@ plugins:
       value: '2023-03-01T00:00:00Z'
       kind: date_iso8601
     - name: end_date
-      value: '2023-03-31T00:00:00Z'
       kind: date_iso8601
-    - name: account_id
-      kind: string
+    - name: account_ids
+      kind: array
     - name: api_version
-      value: 'v16.0'
-    config:
-      insights_buffer_days: 7
+      value: 'v23.0'
+  loaders:
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
 environments:
 - name: dev

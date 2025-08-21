@@ -17,7 +17,9 @@ from tap_facebook.streams import (
     AdsetsStream,
     AdsInsightStream,
     AdsStream,
+    AdTrackingStream,
     AdVideos,
+    AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
     CustomAudiences,
@@ -27,6 +29,7 @@ from tap_facebook.streams import (
 STREAM_TYPES = [
     AdsetsStream,
     AdsStream,
+    AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
     AdLabelsStream,
@@ -35,6 +38,7 @@ STREAM_TYPES = [
     CustomAudiences,
     AdImages,
     AdVideos,
+    AdTrackingStream,
 ]
 
 DEFAULT_INSIGHT_REPORT = {
@@ -70,9 +74,11 @@ class TapFacebook(Tap):
             default="v22.0",
         ),
         th.Property(
-            "account_id",
-            th.StringType,
-            description="Your Facebook Account ID.",
+            "account_ids",
+            th.ArrayType(
+                th.StringType,
+            ),
+            description="List of account_ids.",
             required=True,
         ),
         th.Property(
@@ -155,6 +161,14 @@ class TapFacebook(Tap):
                             "action_report_time=conversion, you see a conversion on Jan 2nd."
                         ),
                         default="mixed",
+                    ),
+                    th.Property(
+                        "fields_to_select",
+                        th.ArrayType(th.StringType),
+                        description=(
+                            "A list of fields to select in the report."
+                        ),
+                        default = [],
                     ),
                     th.Property(
                         "lookback_window",

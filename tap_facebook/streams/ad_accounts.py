@@ -215,6 +215,10 @@ class AdAccountsStream(FacebookStream):
         Property("tax_id", StringType),
     ).to_dict()
 
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
     def post_process(
         self,
         row: Record,

@@ -1,4 +1,7 @@
 """Stream class for AdLabels."""
+from __future__ import annotations
+
+import typing as t
 
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
@@ -26,7 +29,7 @@ class AdLabelsStream(FacebookStream):
     columns = ["id", "account", "created_time", "updated_time", "name"]  # noqa: RUF012
 
     name = "adlabels"
-    path = f"/adlabels?fields={columns}"
+    path = "adlabels"
     primary_keys = ["id", "updated_time"]  # noqa: RUF012
     tap_stream_id = "adlabels"
     replication_method = REPLICATION_INCREMENTAL
@@ -45,3 +48,13 @@ class AdLabelsStream(FacebookStream):
         Property("updated_time", StringType),
         Property("name", StringType),
     ).to_dict()
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/adlabels?fields={self.columns}"
+

@@ -154,69 +154,83 @@ class AdsInsightStream(Stream):
         )
         fb_user.User(fbid="me")
 
-        account_id = self.config["account_id"]
-        self.account = AdAccount(f"act_{account_id}").api_get()
-        if not self.account:
-            msg = f"Couldn't find account with id {account_id}"
-            raise RuntimeError(msg)
+        account_ids = self.config.get("account_ids", [])
+        self.accounts = []
+        for account_id in account_ids:
+            account = AdAccount(f"act_{account_id}").api_get()
+            if not account:
+                msg = f"Couldn't find account with id {account_id}"
+                raise RuntimeError(msg)
+            self.accounts.append(account)
 
     def _run_job_to_completion(self, params: dict) -> None:
-        job = self.account.get_insights(
-            params=params,
-            is_async=True,
-        )
-        status = None
-        time_start = time.time()
-        while status != "Job Completed":
-            duration = time.time() - time_start
-            job = job.api_get()
-            status = job[AdReportRun.Field.async_status]
-            percent_complete = job[AdReportRun.Field.async_percent_completion]
-
-            job_id = job["id"]
-            self.logger.info(
-                "%s for %s - %s. %s%% done. ",
-                status,
-                params["time_range"]["since"],
-                params["time_range"]["until"],
-                percent_complete,
+        results = []
+        for account in self.accounts:
+            job = account.get_insights(
+                params=params,
+                is_async=True,
             )
+            status = None
+            time_start = time.time()
+            while status != "Job Completed":
+                duration = time.time() - time_start
+                job = job.api_get()
+                status = job[AdReportRun.Field.async_status]
+                percent_complete = job[AdReportRun.Field.async_percent_completion]
 
-            if status == "Job Completed":
-                return job
-            if status == "Job Failed":
-                raise RuntimeError(dict(job))
-            if duration > INSIGHTS_MAX_WAIT_TO_START_SECONDS and percent_complete == 0:
-                error_message = (
-                    f"Insights job {job_id} did not start after "
-                    f"{INSIGHTS_MAX_WAIT_TO_START_SECONDS} seconds. "
-                    "This is an intermittent error and may resolve itself on subsequent "
-                    "queries to the Facebook API. "
-                    "You should deselect fields from the schema that are not necessary, "
-                    "as that may help improve the reliability of the Facebook API."
+                job_id = job["id"]
+                self.logger.info(
+                    "%s for %s - %s. %s%% done. ",
+                    status,
+                    params["time_range"]["since"],
+                    params["time_range"]["until"],
+                    percent_complete,
                 )
-                raise RuntimeError(error_message)
 
-            if duration > INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS:
-                error_message = (
-                    f"Insights job {job_id} did not complete after "
-                    f"{INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS // 60} seconds. "
-                    "This is an intermittent error and may resolve itself on "
-                    "subsequent queries to the Facebook API. "
-                    "You should deselect fields from the schema that are not necessary, "
-                    "as that may help improve the reliability of the Facebook API."
+                if status == "Job Completed":
+                    results.append(job)
+                    break
+                if status == "Job Failed":
+                    raise RuntimeError(dict(job))
+                if duration > INSIGHTS_MAX_WAIT_TO_START_SECONDS and percent_complete == 0:
+                    error_message = (
+                        f"Insights job {job_id} did not start after "
+                        f"{INSIGHTS_MAX_WAIT_TO_START_SECONDS} seconds. "
+                        "This is an intermittent error and may resolve itself on subsequent "
+                        "queries to the Facebook API. "
+                        "You should deselect fields from the schema that are not necessary, "
+                        "as that may help improve the reliability of the Facebook API."
+                    )
+                    raise RuntimeError(error_message)
+
+                if duration > INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS:
+                    error_message = (
+                        f"Insights job {job_id} did not complete after "
+                        f"{INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS // 60} seconds. "
+                        "This is an intermittent error and may resolve itself on "
+                        "subsequent queries to the Facebook API. "
+                        "You should deselect fields from the schema that are not necessary, "
+                        "as that may help improve the reliability of the Facebook API."
+                    )
+                    raise RuntimeError(error_message)
+
+                self.logger.info(
+                    "Sleeping for %s seconds until job is done",
+                    SLEEP_TIME_INCREMENT,
                 )
-                raise RuntimeError(error_message)
+                time.sleep(SLEEP_TIME_INCREMENT)
 
-            self.logger.info(
-                "Sleeping for %s seconds until job is done",
-                SLEEP_TIME_INCREMENT,
-            )
-            time.sleep(SLEEP_TIME_INCREMENT)
-        msg = "Job failed to complete for unknown reason"
-        raise RuntimeError(msg)
+        return results
 
     def _get_selected_columns(self) -> list[str]:
+
+        fields_to_select = []
+        for report in self.config.get("insight_reports_list", []):
+            fields_to_select.extend(report.get("fields_to_select", []))
+
+        for keys, data in self.metadata.items():
+            if keys and keys[-1] in fields_to_select:
+                data.selected = True
         columns = [
             keys[1] for keys, data in self.metadata.items() if data.selected and len(keys) > 0
         ]
@@ -301,9 +315,10 @@ class AdsInsightStream(Stream):
                     "until": report_end.to_date_string(),
                 },
             }
-            job = self._run_job_to_completion(params)  # type: ignore[func-returns-value]
-            for obj in job.get_result():
-                yield obj.export_all_data()
+            jobs = self._run_job_to_completion(params)
+            for job in jobs:
+                for obj in job.get_result():
+                    yield obj.export_all_data()
             # Bump to the next increment
             report_start = report_start.add(days=time_increment)
             report_end = report_end.add(days=time_increment)

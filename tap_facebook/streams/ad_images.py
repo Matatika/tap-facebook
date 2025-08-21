@@ -53,7 +53,7 @@ class AdImages(FacebookStream):
     ]
 
     name = "adimages"
-    path = f"/adimages?fields={columns}"
+    path = "/adimages"
     tap_stream_id = "images"
     replication_method = REPLICATION_INCREMENTAL
     replication_key = "updated_time"
@@ -85,3 +85,12 @@ class AdImages(FacebookStream):
         params = super().get_url_params(context, next_page_token)
         params.pop("sort")
         return params
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/adimages?fields={self.columns}"

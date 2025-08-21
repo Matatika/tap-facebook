@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import typing as t
+
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     BooleanType,
@@ -38,7 +40,7 @@ class CustomConversions(FacebookStream):
     ]
 
     name = "customconversions"
-    path = f"/customconversions?fields={columns}"
+    path = "customconversions"
     tap_stream_id = "customconversions"
     primary_keys = ["id"]  # noqa: RUF012
     replication_method = REPLICATION_INCREMENTAL
@@ -54,3 +56,12 @@ class CustomConversions(FacebookStream):
         Property("is_unavailable", BooleanType),
         Property("last_fired_time", StringType),
     ).to_dict()
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/customconversions?fields={self.columns}"

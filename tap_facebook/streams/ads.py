@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import typing as t
+
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -54,7 +56,7 @@ class AdsStream(IncrementalFacebookStream):
     name = "ads"
     filter_entity = "ad"
 
-    path = f"/ads?fields={columns}"
+    path = "ads"
 
     primary_keys = ["id", "updated_time"]  # noqa: RUF012
     replication_method = REPLICATION_INCREMENTAL
@@ -159,3 +161,12 @@ class AdsStream(IncrementalFacebookStream):
     ).to_dict()
 
     tap_stream_id = "ads"
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/ads?fields={self.columns}"

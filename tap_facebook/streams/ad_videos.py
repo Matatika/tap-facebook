@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import typing as t
+
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -16,6 +18,9 @@ from singer_sdk.typing import (
 )
 
 from tap_facebook.client import FacebookStream
+
+if t.TYPE_CHECKING:
+    from singer_sdk.helpers.types import Context, Record
 
 
 class AdVideos(FacebookStream):
@@ -72,7 +77,7 @@ class AdVideos(FacebookStream):
     ]
 
     name = "advideos"
-    path = f"/advideos?fields={columns}"
+    path = "advideos"
     tap_stream_id = "videos"
     replication_method = REPLICATION_INCREMENTAL
     replication_key = "id"
@@ -117,3 +122,31 @@ class AdVideos(FacebookStream):
         Property("updated_time", StringType),
         Property("views", IntegerType),
     ).to_dict()
+
+    def generate_child_contexts(
+            self,
+            record: Record,
+    ) -> t.Iterable[Context | None]:
+        """Generates child contexts from a given record.
+
+        This method takes an input record to produce one or more child contexts.
+        The operation is aimed at further processing or analysis by organizing
+        information into separate contextual pieces.
+
+        Arguments:
+            record: A Record instance representing the data to process.
+
+        Yields:
+            Context or None: Each generated child context derived from the input record.
+        """
+        return {"video_id": record["id"]}
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/advideos?fields={self.columns}"
+

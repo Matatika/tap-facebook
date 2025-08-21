@@ -35,9 +35,7 @@ class CustomAudiences(FacebookStream):
     name = "customaudiences"
     primary_keys = ["id"]  # noqa: RUF012
 
-    @property
-    def path(self) -> str:  # type: ignore[override]
-        return f"/customaudiences?fields={self.columns}"
+    path = "customaudiences"
 
     @property
     def columns(self) -> list[str]:
@@ -62,6 +60,7 @@ class CustomAudiences(FacebookStream):
             "rule_aggregation",
             "opt_out_link",
             "name",
+            "rule",
         ]
 
     schema = PropertiesList(
@@ -74,6 +73,13 @@ class CustomAudiences(FacebookStream):
         Property("time_content_updated", StringType),
         Property("customer_file_source", StringType),
         Property("data_source", ObjectType()),
+        Property(
+            "data_source",
+            ObjectType(
+                Property("type", StringType),
+                Property("sub_type", StringType),
+                ),
+        ),
         Property("delivery_status", ObjectType()),
         Property("description", StringType),
         Property(
@@ -90,7 +96,13 @@ class CustomAudiences(FacebookStream):
             ),
         ),
         Property("is_value_based", BooleanType),
-        Property("operation_status", ObjectType()),
+        Property(
+            "operation_status",
+            ObjectType(
+        Property("code", IntegerType),
+        Property("description", StringType),
+            ),
+        ),
         Property("permission_for_actions", ObjectType()),
         Property("pixel_id", StringType),
         Property("retention_days", IntegerType),
@@ -98,6 +110,7 @@ class CustomAudiences(FacebookStream):
         Property("rule_aggregation", StringType),
         Property("opt_out_link", StringType),
         Property("name", StringType),
+        Property("rule", StringType),
     ).to_dict()
 
     def get_url_params(
@@ -119,3 +132,12 @@ class CustomAudiences(FacebookStream):
             params["after"] = next_page_token
 
         return params
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/customaudiences?fields={self.columns}"

@@ -69,7 +69,7 @@ class CampaignStream(IncrementalFacebookStream):
     name = "campaigns"
     filter_entity = "campaign"
 
-    path = f"/campaigns?fields={columns}"
+    path = "campaigns"
     primary_keys = ["id", "updated_time"]  # noqa: RUF012
     tap_stream_id = "campaigns"
     replication_method = REPLICATION_INCREMENTAL
@@ -135,6 +135,15 @@ class CampaignStream(IncrementalFacebookStream):
         Property("daily_budget", IntegerType),
         Property("special_ad_category_country", ArrayType),
     ).to_dict()
+
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
+    def get_url(self, context: dict | None) -> str:
+        version = self.config["api_version"]
+        account_id = context["_current_account_id"]
+        return f"https://graph.facebook.com/{version}/act_{account_id}/campaigns?fields={self.columns}"
 
     def post_process(
         self,
