@@ -15,7 +15,7 @@ from singer_sdk.typing import (
 )
 
 from tap_facebook.client import FacebookStream
-from tap_facebook.streams import AdVideos
+from tap_facebook.streams.ad_videos import AdVideos
 
 if t.TYPE_CHECKING:
     from singer_sdk.helpers.types import Context, Record
