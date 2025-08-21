@@ -191,7 +191,12 @@ class AdsInsightStream(Stream):
                     results.append(job)
                     break
                 if status == "Job Failed":
-                    raise RuntimeError(dict(job))
+                    self.logger.error(
+                        "Async insights job failed for account %s: %s",
+                        account["id"],
+                        dict(job),
+                    )
+                    break
                 if duration > INSIGHTS_MAX_WAIT_TO_START_SECONDS and percent_complete == 0:
                     error_message = (
                         f"Insights job {job_id} did not start after "
@@ -305,7 +310,7 @@ class AdsInsightStream(Stream):
                 "breakdowns": self._report_definition["breakdowns"],
                 "fields": columns,
                 "time_increment": time_increment,
-                "limit": 100,
+                "limit": 1000,
                 "action_attribution_windows": [
                     self._report_definition["action_attribution_windows_view"],
                     self._report_definition["action_attribution_windows_click"],
