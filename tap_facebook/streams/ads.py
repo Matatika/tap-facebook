@@ -17,7 +17,7 @@ from singer_sdk.typing import (
     StringType,
 )
 
-from tap_facebook.client import IncrementalFacebookStream
+from tap_facebook.client import IncrementalFacebookStream, SkipAccountError
 
 if t.TYPE_CHECKING:
     from singer_sdk.helpers.types import Context
@@ -249,7 +249,7 @@ class AdsStream(IncrementalFacebookStream):
 
         report_start = self._get_start_date(context)
         report_end = report_start.add(days=time_increment)
-
+        account_id = context["_current_account_id"]
         while report_start <= sync_end_date:
             # Add the current window into the context
             chunk_context = dict(context or {})
@@ -263,8 +263,11 @@ class AdsStream(IncrementalFacebookStream):
                 chunk_context["_until"],
             )
 
-            # Let Singer SDK handle pagination & fetching
-            yield from super().get_records(chunk_context)
+            try:
+                yield from super().get_records(chunk_context)
+            except SkipAccountError as e:
+                self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
+                return  # stops this account, continues next partition
 
             # bump the window forward
             report_start = report_end.add(days=1)
