@@ -7,6 +7,7 @@ import typing as t
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
+    DateTimeType,
     IntegerType,
     ObjectType,
     PropertiesList,
@@ -84,8 +85,8 @@ class AdsStream(IncrementalFacebookStream):
             ObjectType(Property("creative_id", StringType), Property("id", StringType)),
         ),
         Property("id", StringType),
-        Property("updated_time", StringType),
-        Property("created_time", StringType),
+        Property("updated_time", DateTimeType),
+        Property("created_time", DateTimeType),
         Property("name", StringType),
         Property("effective_status", StringType),
         Property("last_updated_by_app_id", StringType),

@@ -141,7 +141,7 @@ class AdsetsStream(IncrementalFacebookStream):
         ),
         Property("id", StringType),
         Property("account_id", StringType),
-        Property("updated_time", StringType),
+        Property("updated_time", DateTimeType),
         Property("daily_budget", StringType),
         Property("budget_remaining", StringType),
         Property("effective_status", StringType),

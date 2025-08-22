@@ -77,7 +77,7 @@ class AdVideos(FacebookStream):
     path = "advideos"
     tap_stream_id = "videos"
     replication_method = REPLICATION_INCREMENTAL
-    replication_key = "id"
+    replication_key = "updated_time"
 
     schema = PropertiesList(
         Property("id", StringType),
@@ -116,7 +116,7 @@ class AdVideos(FacebookStream):
         Property("status_value", StringType),
         Property("title", StringType),
         Property("universal_video_id", StringType),
-        Property("updated_time", StringType),
+        Property("updated_time", DateTimeType),
         Property("views", IntegerType),
     ).to_dict()
 
