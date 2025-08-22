@@ -138,6 +138,11 @@ class FacebookStream(RESTStream):
                 f"{response.status_code} Server Error: "
                 f"{response.content!s} (Reason: {response.reason}) for path: {full_path}"
             )
+            # If message hints at too much data, retry
+            if "please reduce the amount of data" in str(response.content).lower():
+                raise RetriableAPIError(msg, response)
+
+            # Otherwise, skip the account
             raise SkipAccountError(msg)
 
     def backoff_max_tries(self) -> int:
