@@ -17,6 +17,9 @@ from singer_sdk.typing import (
 
 from tap_facebook.client import IncrementalFacebookStream
 
+if t.TYPE_CHECKING:
+    from singer_sdk.helpers.types import Context
+
 
 class AdsStream(IncrementalFacebookStream):
     """Ads stream class.
@@ -171,3 +174,26 @@ class AdsStream(IncrementalFacebookStream):
         version = self.config["api_version"]
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/ads?fields={self.columns}"
+
+    def get_url_params(
+        self,
+        context: Context | None,  # noqa: ARG002
+        next_page_token: t.Any | None,  # noqa: ANN401
+    ) -> dict[str, t.Any]:
+        """Return a dictionary of values to be used in URL parameterization.
+
+        Args:
+            context: The stream context.
+            next_page_token: The next page index or value.
+
+        Returns:
+            A dictionary of URL query parameters.
+        """
+        params: dict = {"limit": 500}
+        if next_page_token is not None:
+            params["after"] = next_page_token
+        if self.replication_key:
+            params["sort"] = "asc"
+            params["order_by"] = self.replication_key
+
+        return params
