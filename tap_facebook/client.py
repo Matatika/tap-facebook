@@ -126,12 +126,19 @@ class FacebookStream(RESTStream):
 
             raise FatalAPIError(msg)
 
-        if response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:
+        if response.status_code > HTTPStatus.INTERNAL_SERVER_ERROR:
             msg = (
                 f"{response.status_code} Server Error: "
                 f"{response.content!s} (Reason: {response.reason}) for path: {full_path}"
             )
             raise RetriableAPIError(msg, response)
+
+        if response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+            msg = (
+                f"{response.status_code} Server Error: "
+                f"{response.content!s} (Reason: {response.reason}) for path: {full_path}"
+            )
+            raise SkipAccountError(msg)
 
     def backoff_max_tries(self) -> int:
         """The number of attempts before giving up when retrying requests.
@@ -143,6 +150,8 @@ class FacebookStream(RESTStream):
         """
         return 20
 
+class SkipAccountError(Exception):
+    """Raised when an account should be skipped due to a server error."""
 
 class IncrementalFacebookStream(FacebookStream, metaclass=abc.ABCMeta):
     @property

@@ -15,7 +15,7 @@ from singer_sdk.typing import (
     StringType,
 )
 
-from tap_facebook.client import FacebookStream
+from tap_facebook.client import FacebookStream, SkipAccountError
 
 if t.TYPE_CHECKING:
     from singer_sdk.helpers.types import Context
@@ -94,3 +94,11 @@ class AdImages(FacebookStream):
         version = self.config["api_version"]
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/adimages?fields={self.columns}"
+
+    def get_records(self, context: dict | None) -> t.Iterator[dict]:
+        account_id = context["_current_account_id"]
+        try:
+            yield from super().get_records(context)
+        except SkipAccountError as e:
+            self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
+            return  # stops this account, continues next partition
