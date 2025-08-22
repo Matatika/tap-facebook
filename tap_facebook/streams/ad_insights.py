@@ -233,9 +233,17 @@ class AdsInsightStream(Stream):
         for report in self.config.get("insight_reports_list", []):
             fields_to_select.extend(report.get("fields_to_select", []))
 
-        for keys, data in self.metadata.items():
-            if keys and keys[-1] in fields_to_select:
-                data.selected = True
+        if self.name != "adsinsights_default":
+        # Custom report → force only fields_to_select
+        # Reset all selections first
+            for data in self.metadata.values():
+                data.selected = False
+
+        # Select only configured fields
+            for keys, data in self.metadata.items():
+                if keys and keys[-1] in fields_to_select:
+                    data.selected = True
+
         columns = [
             keys[1] for keys, data in self.metadata.items() if data.selected and len(keys) > 0
         ]
