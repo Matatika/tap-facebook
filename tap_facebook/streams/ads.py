@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import typing as t
 
+import pendulum
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -177,7 +179,7 @@ class AdsStream(IncrementalFacebookStream):
 
     def get_url_params(
         self,
-        context: Context | None,  # noqa: ARG002
+        context: Context | None,
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
         """Return a dictionary of values to be used in URL parameterization.
@@ -189,7 +191,12 @@ class AdsStream(IncrementalFacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 500}
+        params: dict = {"limit": 50}
+        if context and "_since" in context and "_until" in context:
+            params["time_range"] = json.dumps({
+                "since": context["_since"],
+                "until": context["_until"],
+            })
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -197,3 +204,68 @@ class AdsStream(IncrementalFacebookStream):
             params["order_by"] = self.replication_key
 
         return params
+
+    def _get_start_date(
+        self,
+        context: Context | None,
+    ) -> pendulum.Date:
+
+        config_start_date = pendulum.parse(self.config["start_date"]).date()  # type: ignore[union-attr]
+        incremental_start_date = pendulum.parse(  # type: ignore[union-attr]
+            self.get_starting_replication_key_value(context),  # type: ignore[arg-type]
+        ).date()
+
+        if config_start_date >= incremental_start_date:
+            report_start = config_start_date
+        else:
+            report_start = incremental_start_date
+
+        # Facebook store metrics maximum of 37 months old. Any time range that
+        # older that 37 months from current date would result in 400 Bad request
+        # HTTP response.
+        # https://developers.facebook.com/docs/marketing-api/reference/ad-account/insights/#overview
+        today = pendulum.today().date()
+        oldest_allowed_start_date = today.subtract(months=37)
+        if report_start < oldest_allowed_start_date:
+            report_start = oldest_allowed_start_date
+            self.logger.info(
+                "Report start date '%s' is older than 37 months. "
+                "Using oldest allowed start date '%s' instead.",
+                report_start,
+                oldest_allowed_start_date,
+            )
+        return report_start
+
+    def get_records(
+        self,
+        context: Context | None,
+    ) -> t.Iterable[dict | tuple[dict, dict | None]]:
+        """Yield Ads records in smaller date chunks using since/until (7 days by default)."""
+        time_increment = 7  # fixed at 7-day chunks
+
+        sync_end_date = pendulum.parse(
+            self.config.get("end_date", pendulum.today().to_date_string()),
+        ).date()
+
+        report_start = self._get_start_date(context)
+        report_end = report_start.add(days=time_increment)
+
+        while report_start <= sync_end_date:
+            # Add the current window into the context
+            chunk_context = dict(context or {})
+            chunk_context["_since"] = report_start.to_date_string()
+            chunk_context["_until"] = report_end.to_date_string()
+
+            self.logger.info(
+                "Fetching Ads for account %s from %s to %s",
+                chunk_context["_current_account_id"],
+                chunk_context["_since"],
+                chunk_context["_until"],
+            )
+
+            # Let Singer SDK handle pagination & fetching
+            yield from super().get_records(chunk_context)
+
+            # bump the window forward
+            report_start = report_end.add(days=1)
+            report_end = report_start.add(days=time_increment)
