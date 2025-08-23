@@ -294,6 +294,10 @@ class AdsInsightStream(Stream):
             )
         return report_start
 
+    @property
+    def partitions(self) -> list[dict[str, t.Any]]:
+        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+
     def get_records(
         self,
         context: Context | None,
