@@ -10,6 +10,7 @@ from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
     BooleanType,
+    CustomType,
     DateTimeType,
     IntegerType,
     ObjectType,
@@ -227,13 +228,6 @@ class AdsetsStream(IncrementalFacebookStream):
                         ),
                     ),
                 ),
-                Property(
-                    "geo_locations",
-                    ObjectType(
-                        Property("countries", ArrayType(StringType)),
-                        Property("location_types", ArrayType(StringType)),
-                    ),
-                ),
                 Property("genders", ArrayType(IntegerType)),
                 Property("brand_safety_content_filter_levels", ArrayType(StringType)),
                 Property("publisher_platforms", ArrayType(StringType)),
@@ -277,32 +271,33 @@ class AdsetsStream(IncrementalFacebookStream):
                         Property("places", ArrayType(StringType)),
                         Property("regions", ArrayType(ObjectType())),
                         Property("cities", ArrayType(ObjectType())),
-                        Property("zips", ArrayType(ObjectType())),
+                        Property("zips", CustomType({"type": ["array","object","null"]})),
                     ),
                 ),
                 Property("excluded_publisher_categories", ArrayType(StringType)),
                 Property("excluded_publisher_list_ids", ArrayType(StringType)),
                 Property("excluded_user_device", ArrayType(StringType)),
-                Property("exclusions", ArrayType(ObjectType())),
+                Property("exclusions", CustomType({"type": ["object", "array", "null"]})),
                 Property("family_statuses", ArrayType(ObjectType())),
-                Property("flexible_spec", ArrayType(ObjectType())),
                 Property("friends_of_connections", ArrayType(ObjectType())),
                 Property(
                     "geo_locations",
                     ObjectType(
-                        Property("cities", ArrayType(ObjectType())),
+                        Property("countries", CustomType({"type": ["array","object","null"]})),
+                        Property("location_types", CustomType({"type": ["array","object","null"]})),
+                        Property("cities", CustomType({"type": ["array","object","null"]})),
                         Property("country_groups", ArrayType(StringType)),
                         Property("custom_locations", ArrayType(StringType)),
                         Property("electoral_district", ArrayType(StringType)),
                         Property("geo_markets", ArrayType(ObjectType())),
                         Property("places", ArrayType(StringType)),
-                        Property("regions", ArrayType(ObjectType())),
-                        Property("zips", ArrayType(ObjectType())),
+                        Property("regions", CustomType({"type": ["array","object","null"]})),
+                        Property("zips", CustomType({"type": ["array","object","null"]})),
                     ),
                 ),
                 Property("income", ArrayType(ObjectType())),
                 Property("industries", ArrayType(ObjectType())),
-                Property("interests", ArrayType(StringType)),
+                Property("interests", ArrayType(ObjectType())),
                 Property("life_events", ArrayType(ObjectType())),
                 Property("locales", ArrayType(IntegerType)),
                 Property("relationship_statuses", ArrayType(StringType)),
@@ -343,7 +338,7 @@ class AdsetsStream(IncrementalFacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 100}
+        params: dict = {"limit": 50}
         if context and "_since" in context and "_until" in context:
             params["time_range"] = json.dumps({
                 "since": context["_since"],
