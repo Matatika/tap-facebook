@@ -67,6 +67,9 @@ EXCLUDED_FIELDS = [
 SLEEP_TIME_INCREMENT = 5
 INSIGHTS_MAX_WAIT_TO_START_SECONDS = 5 * 60
 INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS = 30 * 60
+MAX_RETRIES_START = 3
+MAX_RETRIES_FINISH = 2
+WAIT_BETWEEN_RETRIES = 30  # seconds
 
 
 class AdsInsightStream(Stream):
@@ -158,6 +161,8 @@ class AdsInsightStream(Stream):
         job = account.get_insights(params=params, is_async=True)
         status = None
         time_start = time.time()
+        retries_start = 0
+        retries_finish = 0
         while status != "Job Completed":
             duration = time.time() - time_start
             job = job.api_get()
@@ -183,26 +188,43 @@ class AdsInsightStream(Stream):
                 )
                 break
             if duration > INSIGHTS_MAX_WAIT_TO_START_SECONDS and percent_complete == 0:
-                error_message = (
-                    f"Insights job {job_id} did not start after "
-                    f"{INSIGHTS_MAX_WAIT_TO_START_SECONDS} seconds. "
-                    "This is an intermittent error and may resolve itself on subsequent "
-                    "queries to the Facebook API. "
-                    "You should deselect fields from the schema that are not necessary, "
-                    "as that may help improve the reliability of the Facebook API."
-                )
-                raise RuntimeError(error_message)
+                retries_start += 1
+                self.logger.warning(
+                "Job %s did not start after %s seconds (account %s, time range %s-%s). Retry %s/%s",
+                job_id,
+                INSIGHTS_MAX_WAIT_TO_START_SECONDS,
+                account["id"],
+                params["time_range"]["since"],
+                params["time_range"]["until"],
+                retries_start,
+                MAX_RETRIES_START,
+            )
+                if retries_start >= MAX_RETRIES_START:
+                    self.logger.error("Max retries reached for job start. Skipping this slice.")
+                    return None
+                time.sleep(WAIT_BETWEEN_RETRIES)
+                continue
 
             if duration > INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS:
-                error_message = (
-                    f"Insights job {job_id} did not complete after "
-                    f"{INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS // 60} seconds. "
-                    "This is an intermittent error and may resolve itself on "
-                    "subsequent queries to the Facebook API. "
-                    "You should deselect fields from the schema that are not necessary, "
-                    "as that may help improve the reliability of the Facebook API."
-                )
-                raise RuntimeError(error_message)
+                retries_finish += 1
+                self.logger.warning(
+                (
+                    "Job %s did not complete after %s seconds "
+                    "(account %s, time range %s-%s). Retry %s/%s"
+                ),
+                job_id,
+                INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS,
+                account["id"],
+                params["time_range"]["since"],
+                params["time_range"]["until"],
+                retries_finish,
+                MAX_RETRIES_FINISH,
+            )
+                if retries_finish >= MAX_RETRIES_FINISH:
+                    self.logger.error("Max retries reached for job finish. Skipping this slice.")
+                    return None
+                time.sleep(WAIT_BETWEEN_RETRIES)
+                continue
 
             self.logger.info(
                 "Sleeping for %s seconds until job is done",
