@@ -331,6 +331,11 @@ class AdsInsightStream(Stream):
         if not account:
             msg = f"Couldn't find account with id {account_id}"
             raise RuntimeError(msg)
+
+        # --- Pre-check if this account has insights ---
+        if not self._account_has_insights(account):
+            self.logger.info("Skipping account %s - no insights data.", account_id)
+            return  # skip this partition entirely
         while report_start <= sync_end_date:
             params = {
                 "level": self._report_definition["level"],
@@ -352,7 +357,10 @@ class AdsInsightStream(Stream):
             job = self._run_job_to_completion(account,params)
             if not job:
                 self.logger.warning(
-                    "Skipping records for account %s, time range %s–%s due to failed job or retries.",
+                    (
+                        "Skipping records for account %s, "
+                        "time range %s-%s due to failed job or retries."
+                    ),
                     account["id"],
                     report_start,
                     report_end,
@@ -363,3 +371,14 @@ class AdsInsightStream(Stream):
             # Bump to the next increment
             report_start = report_start.add(days=time_increment)
             report_end = report_end.add(days=time_increment)
+
+    def _account_has_insights(self, account: AdAccount) -> bool:
+        params = {
+            "level": "account",
+            "fields": "account_id",
+            "limit": 1,
+        }
+        response = account.get_insights(params=params)
+        for _ in response:
+            return True  # Found at least one insight
+        return False
