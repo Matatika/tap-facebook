@@ -350,8 +350,16 @@ class AdsInsightStream(Stream):
                 },
             }
             job = self._run_job_to_completion(account,params)
-            for obj in job.get_result():
-                yield obj.export_all_data()
+            if not job:
+                self.logger.warning(
+                    "Skipping records for account %s, time range %s–%s due to failed job or retries.",
+                    account["id"],
+                    report_start,
+                    report_end,
+                )
+            else:
+                for obj in job.get_result():
+                    yield obj.export_all_data()
             # Bump to the next increment
             report_start = report_start.add(days=time_increment)
             report_end = report_end.add(days=time_increment)
