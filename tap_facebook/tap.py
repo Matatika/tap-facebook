@@ -49,7 +49,7 @@ DEFAULT_INSIGHT_REPORT = {
     "action_attribution_windows_view": "1d_view",
     "action_attribution_windows_click": "7d_click",
     "action_report_time": "mixed",
-    "lookback_window": 28,
+    "lookback_window": 3,
 }
 
 
