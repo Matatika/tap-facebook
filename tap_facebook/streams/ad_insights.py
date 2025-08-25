@@ -365,6 +365,7 @@ class AdsInsightStream(Stream):
                     report_start,
                     report_end,
                 )
+                continue
             else:
                 for obj in job.get_result():
                     yield obj.export_all_data()
