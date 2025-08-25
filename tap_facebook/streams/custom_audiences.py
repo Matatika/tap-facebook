@@ -127,7 +127,7 @@ class CustomAudiences(FacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 1000}
+        params: dict = {"limit": 500}
         if next_page_token is not None:
             params["after"] = next_page_token
 
