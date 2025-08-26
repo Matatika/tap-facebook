@@ -287,7 +287,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
                 chunk_context["_since"],
                 chunk_context["_until"],
             )
-            self._last_window_end = report_end
+            self._last_window_end = sync_end_date
             try:
                 yield from super().get_records(chunk_context)
             except SkipAccountError as e:

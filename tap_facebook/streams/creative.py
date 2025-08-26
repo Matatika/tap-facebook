@@ -88,6 +88,7 @@ class CreativeStream(FacebookStream):
     tap_stream_id = "creatives"
     parent_stream_type = AdsStream
     state_partitioning_keys: t.ClassVar[list] = []
+    primary_keys: t.ClassVar[list[str]] = ["id"]
 
 
     schema = PropertiesList(
