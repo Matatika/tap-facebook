@@ -271,8 +271,9 @@ class IncrementalAdsStream(IncrementalFacebookStream):
             self.config.get("end_date", pendulum.today().to_date_string()),
         ).date()
 
+        today = pendulum.today("UTC").date()
         report_start = self._get_start_date(context)
-        report_end = report_start.add(days=time_increment)
+        report_end = min(report_start.add(days=time_increment),today)
         account_id = context["_current_account_id"]
         while report_start <= sync_end_date:
             # Add the current window into the context

@@ -63,6 +63,7 @@ class AdsStream(IncrementalAdsStream):
     replication_method = REPLICATION_INCREMENTAL
     replication_key = "updated_time"
 
+
     schema = PropertiesList(
         Property("bid_type", StringType),
         Property("account_id", StringType),
@@ -171,3 +172,17 @@ class AdsStream(IncrementalAdsStream):
         version = self.config["api_version"]
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/ads?fields={self.columns}"
+
+
+
+    def generate_child_contexts(
+        self,
+        record: dict,
+        context: dict | None = None,
+    ) -> t.Iterable[dict]:
+
+        yield {
+        "creative_id": record["creative"]["id"],
+        "updated_time": record["updated_time"],
+        "_current_account_id": context.get("_current_account_id") if context else None,
+    }
