@@ -5,7 +5,7 @@ from __future__ import annotations
 import abc
 import json
 import typing as t
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from urllib.parse import urlparse
 
@@ -216,11 +216,9 @@ class IncrementalAdsStream(IncrementalFacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {"limit": 50}
-        if context and "_since" in context and "_until" in context:
-            params["time_range"] = json.dumps({
-                "since": context["_since"],
-                "until": context["_until"],
-            })
+        if context and "_since":
+            params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc).timestamp())
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
