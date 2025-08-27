@@ -38,6 +38,7 @@ class CustomAudiences(FacebookStream):
 
     path = "customaudiences"
     parent_stream_type = AdsetsStream
+    state_partitioning_keys: t.ClassVar[list] = []
 
     @property
     def columns(self) -> list[str]:
