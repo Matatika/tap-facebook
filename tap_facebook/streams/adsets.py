@@ -306,6 +306,11 @@ class AdsetsStream(IncrementalAdsStream):
         ),
         Property("lifetime_min_spend_target", StringType),
         Property("lifetime_spend_cap", StringType),
+        Property("custom_audience_id", ArrayType(StringType)),
+        Property("custom_audience_name", ArrayType(StringType)),
+        Property("excluded_custom_audience_id", ArrayType(StringType)),
+        Property("excluded_custom_audience_name", ArrayType(StringType)),
+
     ).to_dict()
 
     tap_stream_id = "adsets"
@@ -318,3 +323,38 @@ class AdsetsStream(IncrementalAdsStream):
         version = self.config["api_version"]
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/adsets?fields={self.columns}"
+
+    def post_process(self, row: dict, context: dict | None = None) -> dict:  # noqa: ARG002
+        """Extract custom_audience_id from targeting.custom_audiences.
+
+        Store it as a list of IDs in a top-level column.
+        """
+        targeting = row.get("targeting", {})
+        custom_audiences = targeting.get("custom_audiences", [])
+        excluded_custom_audiences = targeting.get("excluded_custom_audiences", [])
+
+        row["custom_audience_id"] = [aud["id"] for aud in custom_audiences] or None
+        row["custom_audience_name"] = [aud["name"] for aud in custom_audiences] or None
+        row["excluded_custom_audience_id"] = [
+            aud["id"] for aud in excluded_custom_audiences
+        ] or None
+        row["excluded_custom_audience_name"] = [
+            aud["name"] for aud in excluded_custom_audiences
+        ] or None
+        return row
+
+    def generate_child_contexts(
+        self,
+        record: dict,
+        context: dict | None = None,
+    ) -> t.Iterable[dict]:
+
+        included_ids = record.get("custom_audience_id") or []
+        excluded_ids = record.get("excluded_custom_audience_id") or []
+
+        for ca_id in included_ids + excluded_ids:
+            yield {
+            "custom_audience_id": ca_id,
+            "updated_time": record.get("updated_time"),
+            "_current_account_id": context.get("_current_account_id") if context else None,
+            }
