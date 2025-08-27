@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import typing as t
 
-from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     BooleanType,
     IntegerType,
@@ -44,8 +43,7 @@ class AdVideoThumbnails(FacebookStream):
     name = "advideothumbnails"
     path = "thumbnails"
     tap_stream_id = "videothumbnails"
-    replication_method = REPLICATION_INCREMENTAL
-    replication_key = "id"
+    state_partitioning_keys: t.ClassVar[list] = []
 
     schema = PropertiesList(
         Property("id", StringType),

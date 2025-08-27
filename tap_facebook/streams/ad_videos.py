@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import typing as t
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pendulum
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
@@ -169,11 +168,9 @@ class AdVideos(FacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {"limit": 50}
-        if context and "_since" in context and "_until" in context:
-            params["time_range"] = json.dumps({
-                "since": context["_since"],
-                "until": context["_until"],
-            })
+        if context and "_since":
+            params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc).timestamp())
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -239,7 +236,7 @@ class AdVideos(FacebookStream):
                 chunk_context["_since"],
                 chunk_context["_until"],
             )
-            self._last_window_end = report_end
+            self._last_window_end = sync_end_date
             try:
                 yield from super().get_records(chunk_context)
             except SkipAccountError as e:
