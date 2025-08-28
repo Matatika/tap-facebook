@@ -23,7 +23,7 @@ class AdTrackingStream(FacebookStream):
     parent_stream_type = AdsStream  # parent = ads
     primary_keys: t.ClassVar[list[str]] = ["ad_id"]
     state_partitioning_keys: t.ClassVar[list] = []
-
+    tap_stream_id = "tracking"
 
     schema = PropertiesList(
         Property("ad_id", StringType),

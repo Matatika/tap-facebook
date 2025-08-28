@@ -24,6 +24,7 @@ class AdRecommendationsStream(FacebookStream):
     path = None  # no API call, data comes from parent stream
     primary_keys: t.ClassVar[list[str]] = ["ad_id"]
     state_partitioning_keys: t.ClassVar[list] = []
+    tap_stream_id = "recommendations"
 
 
     schema = PropertiesList(
