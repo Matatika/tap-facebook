@@ -18,10 +18,13 @@ from singer_sdk.typing import (
     Property,
     StringType,
 )
+from typing_extensions import override
 
+from tap_facebook import BufferDeque
 from tap_facebook.client import FacebookStream, SkipAccountError
 
 if t.TYPE_CHECKING:
+    import requests
     from singer_sdk.helpers.types import Context
 
 
@@ -125,25 +128,6 @@ class AdVideos(FacebookStream):
         Property("views", IntegerType),
     ).to_dict()
 
-    def generate_child_contexts(
-        self,
-        record: dict,
-        context: dict | None = None,
-    ) -> t.Iterable[dict]:
-        """Generate child contexts from a given record.
-
-        Args:
-            record: The parent record.
-            context: The parent context (unused here but required by SDK).
-
-        Yields:
-            dict: A child context for downstream streams.
-        """
-        yield {
-        "video_id": record["id"],
-        "_current_account_id": context.get("_current_account_id") if context else None,
-    }
-
     @property
     def partitions(self) -> list[dict[str, t.Any]]:
         return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
@@ -168,9 +152,8 @@ class AdVideos(FacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {"limit": 50}
-        if context and "_since":
-            params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
-                tzinfo=timezone.utc).timestamp())
+        params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
+            tzinfo=timezone.utc).timestamp())
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -257,4 +240,24 @@ class AdVideos(FacebookStream):
                 ).isoformat()
 
         return super()._finalize_state(state)
+
+    @override
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        self.video_ids_buffer = BufferDeque(maxlen=20)
+
+    @override
+    def parse_response(self, response: requests.Response) -> t.Iterator[dict]:
+        yield from super().parse_response(response)
+
+        # make sure we process the remaining buffer entries
+        self.video_ids_buffer.finalize()
+
+    @override
+    def generate_child_contexts(self, record, context):  # noqa: ANN001, ANN201
+        self.video_ids_buffer.append(record["id"])
+
+        with self.video_ids_buffer as buf:
+            if buf.flush:
+                yield {"video_ids": buf}
 

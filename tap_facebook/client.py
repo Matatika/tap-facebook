@@ -85,7 +85,7 @@ class FacebookStream(RESTStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 1000}
+        params: dict = {"limit": 50}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -120,7 +120,7 @@ class FacebookStream(RESTStream):
                 response.status_code == HTTPStatus.BAD_REQUEST
                 and "too many calls" in str(response.content).lower()
             ) or (
-                response.status_code == HTTPStatus.BAD_REQUEST
+                response.status_code in (HTTPStatus.BAD_REQUEST, HTTPStatus.FORBIDDEN)
                 and "request limit reached" in str(response.content).lower()
             ):
                 raise RetriableAPIError(msg, response)
