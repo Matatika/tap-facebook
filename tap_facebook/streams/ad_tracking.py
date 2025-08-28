@@ -4,107 +4,89 @@ from __future__ import annotations
 
 import typing as t
 
-from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
-    ObjectType,
+    DateTimeType,
     PropertiesList,
     Property,
     StringType,
 )
 
 from tap_facebook.client import FacebookStream
-
-if t.TYPE_CHECKING:
-    from singer_sdk.helpers.types import Context
+from tap_facebook.streams.ads import AdsStream
 
 
 class AdTrackingStream(FacebookStream):
-    """https://developers.facebook.com/docs/marketing-api/reference/ad-account/tracking/."""
+    """Child stream for ad tracking specs."""
 
-    """
-    columns: columns which will be added to fields parameter in api
-    name: stream name
-    account_id: facebook account
-    path: path which will be added to api url in client.py
-    schema: instream schema
-    tap_stream_id = stream id
-    """
+    name = "ad_tracking_specs"
+    parent_stream_type = AdsStream  # parent = ads
+    primary_keys: t.ClassVar[list[str]] = ["ad_id"]
+    state_partitioning_keys: t.ClassVar[list] = []
 
-    columns = [# noqa: RUF012
-        "tracking_specs",
-        "updated_time",
-        ]
-
-    name = "adtracking"
-    path = "tracking"
-    tap_stream_id = "tracking"
-    replication_method = REPLICATION_INCREMENTAL
-    replication_key = "updated_time"
 
     schema = PropertiesList(
-        Property("updated_time", StringType),
-        Property(
-            "tracking_specs",
-            ArrayType(
-                ObjectType(
-                    Property(
-                        "application",
-                        ArrayType(ObjectType(Property("items", StringType))),
-                    ),
-                    Property("post", ArrayType(StringType)),
-                    Property("conversion_id", ArrayType(StringType)),
-                    Property("action.type", ArrayType(Property("items", StringType))),
-                    Property("post.type", ArrayType(Property("items", StringType))),
-                    Property("page", ArrayType(Property("items", StringType))),
-                    Property("creative", ArrayType(Property("items", StringType))),
-                    Property("dataset", ArrayType(Property("items", StringType))),
-                    Property("event", ArrayType(Property("items", StringType))),
-                    Property("event.creator", ArrayType(Property("items", StringType))),
-                    Property("event_type", ArrayType(Property("items", StringType))),
-                    Property("fb_pixel", ArrayType(Property("items", StringType))),
-                    Property(
-                        "fb_pixel_event",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("leadgen", ArrayType(Property("items", StringType))),
-                    Property("object", ArrayType(Property("items", StringType))),
-                    Property("object.domain", ArrayType(Property("items", StringType))),
-                    Property("offer", ArrayType(Property("items", StringType))),
-                    Property("offer.creator", ArrayType(Property("items", StringType))),
-                    Property("offsite_pixel", ArrayType(Property("items", StringType))),
-                    Property("page.parent", ArrayType(Property("items", StringType))),
-                    Property("post.object", ArrayType(Property("items", StringType))),
-                    Property(
-                        "post.object.wall",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("question", ArrayType(Property("items", StringType))),
-                    Property(
-                        "question.creator",
-                        ArrayType(Property("items", StringType)),
-                    ),
-                    Property("response", ArrayType(Property("items", StringType))),
-                    Property("subtype", ArrayType(Property("items", StringType))),
-                ),
-            ),
-        ),
+        Property("ad_id", StringType),
+        Property("updated_time", DateTimeType),
+        Property("application", ArrayType(StringType)),
+        Property("post", ArrayType(StringType)),
+        Property("conversion_id", ArrayType(StringType)),
+        Property("action_type", ArrayType(StringType)),
+        Property("post_type", ArrayType(StringType)),
+        Property("page", ArrayType(StringType)),
+        Property("creative", ArrayType(StringType)),
+        Property("dataset", ArrayType(StringType)),
+        Property("event", ArrayType(StringType)),
+        Property("event_creator", ArrayType(StringType)),
+        Property("event_type", ArrayType(StringType)),
+        Property("fb_pixel", ArrayType(StringType)),
+        Property("fb_pixel_event", ArrayType(StringType)),
+        Property("leadgen", ArrayType(StringType)),
+        Property("object", ArrayType(StringType)),
+        Property("object_domain", ArrayType(StringType)),
+        Property("offer", ArrayType(StringType)),
+        Property("offer_creator", ArrayType(StringType)),
+        Property("offsite_pixel", ArrayType(StringType)),
+        Property("page_parent", ArrayType(StringType)),
+        Property("post_object", ArrayType(StringType)),
+        Property("post_object_wall", ArrayType(StringType)),
+        Property("question", ArrayType(StringType)),
+        Property("question_creator", ArrayType(StringType)),
+        Property("response", ArrayType(StringType)),
+        Property("subtype", ArrayType(StringType)),
     ).to_dict()
 
-    @property
-    def partitions(self) -> list[dict[str, t.Any]]:
-        return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
+    def get_records(self, context: dict | None) -> t.Iterable[dict]:
+        if not context or context.get("_child_type") != "tracking_spec":
+            return []
 
-    def get_url(self, context: dict | None) -> str:
-        version = self.config["api_version"]
-        account_id = context["_current_account_id"]
-        return f"https://graph.facebook.com/{version}/act_{account_id}/tracking?fields={self.columns}"
-
-    def get_url_params(
-        self,
-        context: Context | None,
-        next_page_token: t.Any | None,  # noqa: ANN401
-    ) -> dict[str, t.Any]:
-        params = super().get_url_params(context, next_page_token)
-        params.pop("sort")
-        return params
+        yield {
+            "ad_id": context["ad_id"],
+            "updated_time": context["updated_time"],
+            "application": context.get("application"),
+            "post": context.get("post"),
+            "conversion_id": context.get("conversion_id"),
+            "action_type": context.get("action.type"),
+            "post_type": context.get("post.type"),
+            "page": context.get("page"),
+            "creative": context.get("creative"),
+            "dataset": context.get("dataset"),
+            "event": context.get("event"),
+            "event_creator": context.get("event.creator"),
+            "event_type": context.get("event_type"),
+            "fb_pixel": context.get("fb_pixel"),
+            "fb_pixel_event": context.get("fb_pixel_event"),
+            "leadgen": context.get("leadgen"),
+            "object": context.get("object"),
+            "object_domain": context.get("object.domain"),
+            "offer": context.get("offer"),
+            "offer_creator": context.get("offer.creator"),
+            "offsite_pixel": context.get("offsite_pixel"),
+            "page_parent": context.get("page.parent"),
+            "post_object": context.get("post.object"),
+            "post_object_wall": context.get("post.object.wall"),
+            "question": context.get("question"),
+            "question_creator": context.get("question.creator"),
+            "response": context.get("response"),
+            "subtype": context.get("subtype"),
+        }

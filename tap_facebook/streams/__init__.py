@@ -4,6 +4,7 @@ from tap_facebook.streams.ad_accounts import AdAccountsStream
 from tap_facebook.streams.ad_images import AdImages
 from tap_facebook.streams.ad_insights import AdsInsightStream
 from tap_facebook.streams.ad_labels import AdLabelsStream
+from tap_facebook.streams.ad_recommendations import AdRecommendationsStream
 from tap_facebook.streams.ad_tracking import AdTrackingStream
 from tap_facebook.streams.ad_video_thumbnails import AdVideoThumbnails
 from tap_facebook.streams.ad_videos import AdVideos
@@ -18,6 +19,7 @@ __all__ = [
     "AdAccountsStream",
     "AdImages",
     "AdLabelsStream",
+    "AdRecommendationsStream",
     "AdTrackingStream",
     "AdVideoThumbnails",
     "AdVideos",

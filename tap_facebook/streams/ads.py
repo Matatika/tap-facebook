@@ -173,16 +173,29 @@ class AdsStream(IncrementalAdsStream):
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/ads?fields={self.columns}"
 
-
-
     def generate_child_contexts(
-        self,
-        record: dict,
-        context: dict | None = None,
+    self,
+    record: dict,
+    context: dict | None = None,
     ) -> t.Iterable[dict]:
+        base_context = {
+            "ad_id": record["id"],
+            "updated_time": record["updated_time"],
+            "_current_account_id": context.get("_current_account_id") if context else None,
+        }
 
-        yield {
-        "creative_id": record["creative"]["id"],
-        "updated_time": record["updated_time"],
-        "_current_account_id": context.get("_current_account_id") if context else None,
-    }
+        # Context for creatives child stream
+        if "creative" in record and "id" in record["creative"]:
+            yield {
+                **base_context,
+                "creative_id": record["creative"]["id"],
+                "_child_type": "creative",
+            }
+
+        # Context(s) for recommendations child stream
+        for recommendation in record.get("recommendations", []):
+            yield {**base_context, **recommendation, "_child_type": "recommendation"}
+
+        # Tracking specs child
+        for spec in record.get("tracking_specs", []):
+            yield {**base_context, **spec, "_child_type": "tracking_spec"}

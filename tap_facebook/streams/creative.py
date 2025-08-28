@@ -90,7 +90,6 @@ class CreativeStream(FacebookStream):
     state_partitioning_keys: t.ClassVar[list] = []
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
-
     schema = PropertiesList(
         Property("id", StringType),
         Property("account_id", StringType),
@@ -234,3 +233,9 @@ class CreativeStream(FacebookStream):
         if isinstance(data, list):
             return data
         return []
+
+    def get_records(self, context: dict | None) -> t.Iterable[dict]:
+        if not context or context.get("_child_type") != "creative":
+            return []
+        yield from super().get_records(context)
+
