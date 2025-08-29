@@ -166,7 +166,7 @@ class AdVideos(FacebookStream):
         try:
             for record in super().get_records(context):
                 record["account_id"] = account_id
-            yield record
+                yield record
         except SkipAccountError as e:
             self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
             return  # stops this account, continues next partition
