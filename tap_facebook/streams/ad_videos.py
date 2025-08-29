@@ -6,10 +6,7 @@ import typing as t
 
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
-    BooleanType,
     DateTimeType,
-    IntegerType,
-    NumberType,
     PropertiesList,
     Property,
     StringType,
@@ -39,7 +36,6 @@ class AdVideos(FacebookStream):
     columns = [  # noqa: RUF012
         "id",
         "updated_time",
-        "account_id",
         "ad_breaks",
         "backdated_time",
         "backdated_time_granularity",
@@ -84,41 +80,8 @@ class AdVideos(FacebookStream):
 
     schema = PropertiesList(
         Property("id", StringType),
-        Property("account_id", StringType),
-        Property("ad_breaks", StringType),
-        Property("backdated_time", DateTimeType),
-        Property("backdated_time_granularity", StringType),
-        Property("content_category", StringType),
-        Property("content_tags", StringType),
         Property("created_time", StringType),
-        Property("custom_labels", StringType),
-        Property("description", StringType),
-        Property("embed_html", StringType),
-        Property("embeddable", BooleanType),
-        Property("event", StringType),
-        Property("from_object", StringType),
-        Property("icon", StringType),
-        Property("is_crosspost_video", BooleanType),
-        Property("is_crossposting_eligible", BooleanType),
-        Property("is_episode", BooleanType),
-        Property("is_instagram_eligible", BooleanType),
-        Property("is_reference_only", BooleanType),
-        Property("length", NumberType),
-        Property("live_status", StringType),
-        Property("music_video_copyright", StringType),
-        Property("permalink_url", StringType),
-        Property("place", StringType),
-        Property("post_views", IntegerType),
-        Property("premiere_living_room_status", StringType),
-        Property("published", BooleanType),
-        Property("scheduled_publish_time", DateTimeType),
-        Property("source", StringType),
-        Property("status_processing_progress", IntegerType),
-        Property("status_value", StringType),
-        Property("title", StringType),
-        Property("universal_video_id", StringType),
         Property("updated_time", DateTimeType),
-        Property("views", IntegerType),
     ).to_dict()
 
     @property

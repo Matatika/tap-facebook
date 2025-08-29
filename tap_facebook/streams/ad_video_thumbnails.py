@@ -43,7 +43,7 @@ class AdVideoThumbnails(FacebookStream):
     tap_stream_id = "videothumbnails"
     state_partitioning_keys: t.ClassVar[list] = []
     parent_stream_type = AdVideos
-    primary_keys = [id] # noqa: RUF012
+    primary_keys = ["id"] # noqa: RUF012
 
     schema = PropertiesList(
         Property("video_id", StringType),
