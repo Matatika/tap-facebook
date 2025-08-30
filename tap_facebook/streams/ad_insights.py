@@ -179,7 +179,7 @@ class AdsInsightStream(Stream):
 
             if status == "Job Completed":
                 return job
-            if status == "Job Failed":
+            if "failed" in status.lower():
                 self.logger.error(
                     "Async insights job failed for account %s: %s",
                     account["id"],
