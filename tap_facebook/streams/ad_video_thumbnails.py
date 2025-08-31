@@ -78,6 +78,6 @@ class AdVideoThumbnails(FacebookStream):
         Returns:
             int: limit
         """
-        return 12
+        return 13
     def backoff_wait_generator(self) -> t.Generator[float, None, None]:
-        return backoff.constant(interval=300)
+        return backoff.constant(interval=600)
