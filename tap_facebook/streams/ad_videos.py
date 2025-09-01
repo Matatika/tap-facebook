@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing as t
 
+from dateutil import parser
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     DateTimeType,
@@ -93,20 +94,12 @@ class AdVideos(FacebookStream):
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/advideos"
 
+
     def get_url_params(
         self,
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        """Return a dictionary of values to be used in URL parameterization.
-
-        Args:
-            context: The stream context.
-            next_page_token: The next page index or value.
-
-        Returns:
-            A dictionary of URL query parameters.
-        """
         params: dict = {"limit": 50, "fields": ",".join(self.columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
@@ -119,11 +112,15 @@ class AdVideos(FacebookStream):
         self,
         context: Context | None,
     ) -> t.Iterable[dict | tuple[dict, dict | None]]:
+        bookmark = self.get_starting_timestamp(context)
         account_id = context["_current_account_id"]
         try:
             for record in super().get_records(context):
                 record["account_id"] = account_id
-                yield record
+                if record.get("updated_time") and (
+                    bookmark is None or parser.isoparse(record["updated_time"]) > bookmark
+                ):
+                    yield record
         except SkipAccountError as e:
             self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
             return  # stops this account, continues next partition
