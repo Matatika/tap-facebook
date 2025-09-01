@@ -37,39 +37,7 @@ class AdVideos(FacebookStream):
     columns = [  # noqa: RUF012
         "id",
         "updated_time",
-        "ad_breaks",
-        "backdated_time",
-        "backdated_time_granularity",
-        "content_category",
-        "content_tags",
         "created_time",
-        "custom_labels",
-        "description",
-        "embed_html",
-        "embeddable",
-        "event",
-        "from_object",
-        "icon",
-        "is_crosspost_video",
-        "is_crossposting_eligible",
-        "is_episode",
-        "is_instagram_eligible",
-        # "is_reference_only",
-        "length",
-        "live_status",
-        # "music_video_copyright",
-        "permalink_url",
-        "place",
-        "post_views",
-        "premiere_living_room_status",
-        "published",
-        "scheduled_publish_time",
-        "source",
-        "status_processing_progress",
-        "status_value",
-        "title",
-        "universal_video_id",
-        "views",
     ]
 
     name = "advideos"
@@ -100,7 +68,7 @@ class AdVideos(FacebookStream):
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": 50, "fields": ",".join(self.columns)}
+        params: dict = {"limit": 200, "fields": ",".join(self.columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:

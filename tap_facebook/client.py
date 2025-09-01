@@ -125,6 +125,10 @@ class FacebookStream(RESTStream):
             ):
                 raise RetriableAPIError(msg, response)
 
+            if (response.status_code == HTTPStatus.BAD_REQUEST
+            and "permission" in str(response.content).lower()):
+                raise SkipAccountError(msg)
+
             raise FatalAPIError(msg)
 
         if response.status_code > HTTPStatus.INTERNAL_SERVER_ERROR:
