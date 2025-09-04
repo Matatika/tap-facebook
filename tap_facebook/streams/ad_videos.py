@@ -51,6 +51,7 @@ class AdVideos(FacebookStream):
         Property("id", StringType),
         Property("created_time", StringType),
         Property("updated_time", DateTimeType),
+        Property("account_id", StringType),
     ).to_dict()
 
     @property
