@@ -163,6 +163,7 @@ class AdsStream(IncrementalAdsStream):
     ).to_dict()
 
     tap_stream_id = "ads"
+    request_limit = 1000
 
     @property
     def partitions(self) -> list[dict[str, t.Any]]:

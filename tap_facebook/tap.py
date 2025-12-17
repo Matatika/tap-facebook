@@ -12,6 +12,7 @@ if t.TYPE_CHECKING:
 
 from tap_facebook.streams import (
     AdAccountsStream,
+    AdCreativesStream,
     AdImages,
     AdLabelsStream,
     AdRecommendationsStream,
@@ -32,6 +33,7 @@ STREAM_TYPES = [
     AdsStream,
     AdVideoThumbnails,
     CampaignStream,
+    AdCreativesStream,
     CreativeStream,
     AdLabelsStream,
     AdAccountsStream,
@@ -211,7 +213,7 @@ class TapFacebook(Tap):
         """
         streams = [stream_class(tap=self) for stream_class in STREAM_TYPES]
         report_configs = [  # type: ignore[misc]
-            DEFAULT_INSIGHT_REPORT,
+            #DEFAULT_INSIGHT_REPORT,
             *self.config.get("insight_reports_list"),
         ]
         insight_streams = [

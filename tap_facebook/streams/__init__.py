@@ -1,6 +1,7 @@
 """Stream classes for tap-facebook."""
 
 from tap_facebook.streams.ad_accounts import AdAccountsStream
+from tap_facebook.streams.ad_creatives import AdCreativesStream
 from tap_facebook.streams.ad_images import AdImages
 from tap_facebook.streams.ad_insights import AdsInsightStream
 from tap_facebook.streams.ad_labels import AdLabelsStream
@@ -17,6 +18,7 @@ from tap_facebook.streams.custom_conversions import CustomConversions
 
 __all__ = [
     "AdAccountsStream",
+    "AdCreativesStream",
     "AdImages",
     "AdLabelsStream",
     "AdRecommendationsStream",

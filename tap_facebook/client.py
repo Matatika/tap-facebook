@@ -201,6 +201,8 @@ class IncrementalFacebookStream(FacebookStream, metaclass=abc.ABCMeta):
 class IncrementalAdsStream(IncrementalFacebookStream):
     """Incremental ads stream class."""
 
+    request_limit: int = 25
+
     def get_url_params(
         self,
         context: Context | None,
@@ -215,7 +217,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         Returns:
             A dictionary of URL query parameters.
         """
-        params: dict = {"limit": 25}
+        params: dict = {"limit": self.request_limit}
         if context and "_since":
             params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
                 tzinfo=timezone.utc).timestamp())
