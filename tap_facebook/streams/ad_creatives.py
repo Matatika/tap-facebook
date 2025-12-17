@@ -30,14 +30,9 @@ class AdCreativesStream(FacebookStream):
         "applink_treatment",
         "authorization_category",
         "body",
-        "branded_content_sponsor_page_id",
-        "bundle_folder_id",
         "call_to_action_type",
-        "categorization_criteria",
         "category_media_source",
         "degrees_of_freedom_spec",
-        "destination_set_id",
-        "dynamic_ad_voice",
         "effective_authorization_category",
         "effective_instagram_media_id",
         "effective_instagram_story_id",
@@ -45,22 +40,14 @@ class AdCreativesStream(FacebookStream):
         "enable_direct_install",
         "image_hash",
         "image_url",
-        "instagram_actor_id",
         "instagram_permalink_url",
-        "instagram_story_id",
-        "link_destination_display_url",
         "link_og_id",
         "link_url",
-        "messenger_sponsored_message",
         "name",
         "object_id",
-        "object_store_url",
         "object_story_id",
         "object_type",
-        "object_url",
-        "place_page_set_id",
         "platform_customizations",
-        "playable_asset_id",
         "status",
         "template_url",
         "thumbnail_id",
@@ -308,7 +295,7 @@ class AdCreativesStream(FacebookStream):
 
     def backoff_max_tries(self) -> int:  # type: ignore[override]
         """Fail fast so the outer retry loop can rebuild the request with a lower limit."""
-        return 1
+        return 5
 
     def backoff_wait_generator(self) -> t.Generator[float, None, None]:  # type: ignore[override]
         """Disable internal retry backoff; let outer loop handle retries."""
