@@ -26,18 +26,7 @@ class AdCreativesStream(FacebookStream):
     columns = [  # noqa: RUF012
         "id",
         "account_id",
-        "actor_id",
-        "applink_treatment",
-        "authorization_category",
-        "body",
         "call_to_action_type",
-        "category_media_source",
-        "degrees_of_freedom_spec",
-        "effective_authorization_category",
-        "effective_instagram_media_id",
-        "effective_instagram_story_id",
-        "effective_object_story_id",
-        "enable_direct_install",
         "image_hash",
         "image_url",
         "instagram_permalink_url",
@@ -46,16 +35,12 @@ class AdCreativesStream(FacebookStream):
         "name",
         "object_id",
         "object_story_id",
-        "object_type",
-        "platform_customizations",
         "status",
         "template_url",
-        "thumbnail_id",
         "thumbnail_url",
         "title",
-        "url_tags",
-        "use_page_actor_override",
         "video_id",
+        "body",
     ]
     columns_config_key = "ad_creatives_fields"
     field_chunk_size_config_key = "ad_creatives_field_chunk_size"
@@ -200,7 +185,7 @@ class AdCreativesStream(FacebookStream):
     def _field_chunks(self) -> list[list[str]]:
         """Split fields into fixed-size groups; keep heavy fields isolated."""
         chunk_size = 5
-        heavy_fields = {"degrees_of_freedom_spec","body", "url_tags"}
+        heavy_fields = {"body"}
         chunks: list[list[str]] = []
         current: list[str] = ["id"]
 
@@ -295,7 +280,7 @@ class AdCreativesStream(FacebookStream):
 
     def backoff_max_tries(self) -> int:  # type: ignore[override]
         """Fail fast so the outer retry loop can rebuild the request with a lower limit."""
-        return 5
+        return 1
 
     def backoff_wait_generator(self) -> t.Generator[float, None, None]:  # type: ignore[override]
         """Disable internal retry backoff; let outer loop handle retries."""
@@ -306,9 +291,13 @@ class AdCreativesStream(FacebookStream):
         """Request all fields by chunking the field list across multiple passes."""
         account_id = context["_current_account_id"]
         merged_records: dict[str, dict] = {}
-        self._current_limit = 1000
+        default_limit = 1000
+        self._current_limit = default_limit
 
         for field_chunk in self._field_chunks:
+            # Reset the limit for each field chunk so retries on one chunk
+            # do not force subsequent chunks to start with a reduced limit.
+            self._current_limit = default_limit
             while True:
                 self._current_fields = field_chunk
                 try:
@@ -320,6 +309,7 @@ class AdCreativesStream(FacebookStream):
                             continue
                         merged = merged_records.setdefault(record_id, {"id": record_id})
                         merged.update(record)
+                        merged.setdefault("account_id", account_id)
                     break
                 except RetriableAPIError as e:
                     if getattr(self, "_current_limit", 1000) > 500:  # noqa: PLR2004
