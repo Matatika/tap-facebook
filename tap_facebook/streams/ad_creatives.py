@@ -275,6 +275,15 @@ class AdCreativesStream(FacebookStream):
                 current_limit,
             )
             self._current_limit = 100
+        elif current_limit > 50: # noqa: PLR2004
+            self.logger.warning(
+                "Backoff after %s tries on adcreatives fields %s with limit %s; "
+                "reducing limit to 50 for retry.",
+                details.get("tries"),
+                ",".join(current_fields) if isinstance(current_fields, list) else current_fields,
+                current_limit,
+            )
+            self._current_limit = 50
 
         super().backoff_handler(details)
 
@@ -341,6 +350,16 @@ class AdCreativesStream(FacebookStream):
                             e,
                         )
                         self._current_limit = 100
+                        continue
+                    if getattr(self, "_current_limit", 1000) > 50: # noqa: PLR2004
+                        self.logger.warning(
+                            "Retriable error on adcreatives fields %s with limit %s; "
+                            "reducing limit to 50 and retrying. Error: %s",
+                            ",".join(field_chunk),
+                            self._current_limit,
+                            e,
+                        )
+                        self._current_limit = 50
                         continue
                     raise
                 except SkipAccountError as e:
