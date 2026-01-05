@@ -36,7 +36,6 @@ class AdCreativesStream(FacebookStream):
         "object_id",
         "object_story_id",
         "status",
-        "template_url",
         "thumbnail_url",
         "title",
         "video_id",
@@ -184,8 +183,8 @@ class AdCreativesStream(FacebookStream):
     @property
     def _field_chunks(self) -> list[list[str]]:
         """Split fields into fixed-size groups; keep heavy fields isolated."""
-        chunk_size = 5
-        heavy_fields = {"body"}
+        chunk_size = 10
+        heavy_fields = {"body","title","video_id"}
         chunks: list[list[str]] = []
         current: list[str] = ["id"]
 
