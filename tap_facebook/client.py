@@ -265,7 +265,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         context: Context | None,
     ) -> t.Iterable[dict | tuple[dict, dict | None]]:
         """Yield records in smaller date chunks using since/until (7 days by default)."""
-        time_increment = 7  # fixed at 7-day chunks
+        time_increment = 200  # fixed at 7-day chunks
 
         sync_end_date = pendulum.parse(
             self.config.get("end_date", pendulum.today().to_date_string()),

@@ -15,7 +15,9 @@ from singer_sdk.typing import (
     StringType,
 )
 
+from tap_facebook import BufferDeque
 from tap_facebook.client import IncrementalAdsStream
+from tap_facebook.streams.creative import CreativeStream
 
 
 class AdsStream(IncrementalAdsStream):
@@ -62,6 +64,49 @@ class AdsStream(IncrementalAdsStream):
     primary_keys = ["id", "updated_time"]  # noqa: RUF012
     replication_method = REPLICATION_INCREMENTAL
     replication_key = "updated_time"
+    creative_batch_size = 20
+    creative_subrequest_limit = 50
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        # Buffer up to 20 creatives per subrequest and 50 subrequests per Graph batch
+        self._creative_ids_buffer = BufferDeque(
+            maxlen=self.creative_batch_size * self.creative_subrequest_limit
+        )
+        self._creative_account: str | None = None
+
+    def _get_creative_stream(self) -> CreativeStream | None:
+        """Return the creatives child stream instance if selected."""
+        for child_stream in self.child_streams:
+            if isinstance(child_stream, CreativeStream) and (
+                child_stream.selected or child_stream.has_selected_descendents
+            ):
+                return child_stream
+        return None
+
+    def _flush_creative_buffer(self) -> None:
+        """Flush buffered creatives to the creative child stream using batch context."""
+        if not self._creative_ids_buffer:
+            return
+
+        creative_stream = self._get_creative_stream()
+        if not creative_stream:
+            self._creative_ids_buffer.clear()
+            self._creative_account = None
+            return
+
+        unique_ids = list(dict.fromkeys(self._creative_ids_buffer))
+        chunk_size = self.creative_batch_size * self.creative_subrequest_limit
+        for idx in range(0, len(unique_ids), chunk_size):
+            context = {
+                "_current_account_id": self._creative_account,
+                "_child_type": "creative",
+                "creative_ids": unique_ids[idx : idx + chunk_size],
+            }
+            creative_stream.sync(context=context)
+
+        self._creative_ids_buffer.clear()
+        self._creative_account = None
 
 
     schema = PropertiesList(
@@ -200,3 +245,37 @@ class AdsStream(IncrementalAdsStream):
         # Tracking specs child
         for spec in record.get("tracking_specs", []):
             yield {**base_context, **spec, "_child_type": "tracking_spec"}
+
+    def _sync_children(self, child_context: dict | None) -> None:
+        """Batch creative child contexts before syncing."""
+        if child_context and child_context.get("_child_type") == "creative":
+            account_id = child_context.get("_current_account_id")
+            creative_id = child_context.get("creative_id")
+
+            if self._creative_ids_buffer and account_id and account_id != self._creative_account:
+                self._flush_creative_buffer()
+
+            self._creative_account = account_id or self._creative_account
+            if creative_id:
+                self._creative_ids_buffer.append(creative_id)
+
+            # Flush when we hit the max batch capacity (20 ids * 50 subrequests)
+            max_capacity = (
+                self.creative_batch_size * self.creative_subrequest_limit
+            )
+            if len(self._creative_ids_buffer) >= max_capacity:
+                self._flush_creative_buffer()
+            return
+
+        super()._sync_children(child_context)
+
+    def _sync_records(
+        self,
+        context: dict | None = None,
+        *,
+        write_messages: bool = True,
+    ) -> t.Generator[dict, t.Any, t.Any]:
+        try:
+            yield from super()._sync_records(context=context, write_messages=write_messages)
+        finally:
+            self._flush_creative_buffer()

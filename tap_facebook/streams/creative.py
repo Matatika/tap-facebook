@@ -1,7 +1,9 @@
 """Stream class for Creative."""
 from __future__ import annotations
 
+import json
 import typing as t
+from urllib.parse import urlencode
 
 from singer_sdk.typing import (
     BooleanType,
@@ -89,6 +91,8 @@ class CreativeStream(FacebookStream):
     parent_stream_type = AdsStream
     state_partitioning_keys: t.ClassVar[list] = []
     primary_keys: t.ClassVar[list[str]] = ["id"]
+    creative_ids_per_subrequest = 20
+    subrequests_per_batch = 50
 
     schema = PropertiesList(
         Property("id", StringType),
@@ -234,8 +238,85 @@ class CreativeStream(FacebookStream):
             return data
         return []
 
-    def get_records(self, context: dict | None) -> t.Iterable[dict]:
+    def get_records(self, context: dict | None) -> t.Iterable[dict]:  # noqa: C901, PLR0912
         if not context or context.get("_child_type") != "creative":
             return []
-        yield from super().get_records(context)
 
+        creative_ids = context.get("creative_ids") or []
+        if not creative_ids and context.get("creative_id"):
+            creative_ids = [context["creative_id"]]
+
+        creative_ids = [c for c in creative_ids if c]
+        if not creative_ids:
+            return []
+
+        fields_param = ",".join(self.columns)
+
+        # Chunk into subrequests of <=20 creatives, then bundle up to 50 subrequests per batch call.
+        id_chunks = [
+            creative_ids[idx : idx + self.creative_ids_per_subrequest]
+            for idx in range(0, len(creative_ids), self.creative_ids_per_subrequest)
+        ]
+
+        for batch_start in range(0, len(id_chunks), self.subrequests_per_batch):
+            subrequests = []
+            for chunk in id_chunks[batch_start : batch_start + self.subrequests_per_batch]:
+                params = {
+                    "ids": ",".join(chunk),
+                    "fields": fields_param,
+                }
+                # Keep commas unescaped for ids/fields to match Graph expectations
+                relative_url = f"?{urlencode(params, safe=',')}"
+                subrequests.append(
+                    {
+                        "method": "GET",
+                        "relative_url": relative_url,
+                    },
+                )
+
+            version = self.config["api_version"]
+            url = f"https://graph.facebook.com/{version}"
+            payload = {
+                "batch": json.dumps(subrequests),
+                "access_token": self.config["access_token"],
+            }
+            response = self.requests_session.post(url, data=payload)
+            self.validate_response(response)
+
+            try:
+                batch_results = response.json()
+            except Exception:
+                self.logger.exception("Failed to parse creative batch response: %s", response.text)
+                continue
+
+            for item in batch_results or []:
+                body = item.get("body")
+                if not body:
+                    continue
+                try:
+                    data = json.loads(body)
+                except json.JSONDecodeError:
+                    self.logger.warning("Skipping creative batch item with non-JSON body.")
+                    continue
+
+                if isinstance(data, dict) and data.get("error"):
+                    self.logger.warning("Creative batch subrequest error: %s", data)
+                    continue
+
+                records: list[dict] = []
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        if key == "error":
+                            continue
+                        if isinstance(value, dict):
+                            record = dict(value)
+                            record.setdefault("id", key)
+                            records.append(record)
+                elif isinstance(data, list):
+                    records.extend([r for r in data if isinstance(r, dict)])
+
+                account_id = context.get("_current_account_id")
+                for record in records:
+                    if account_id and "account_id" not in record:
+                        record["account_id"] = account_id
+                    yield record
