@@ -1,6 +1,6 @@
 """Stream class for AdsStream."""
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import typing as t
 
@@ -17,7 +17,10 @@ from singer_sdk.typing import (
 
 from tap_facebook import BufferDeque
 from tap_facebook.client import IncrementalAdsStream
-from tap_facebook.streams.creative import CreativeStream
+from typing import TYPE_CHECKING  # noqa: ICN003
+
+if TYPE_CHECKING:
+    from tap_facebook.streams.creative import CreativeStream  # noqa: F401
 
 
 class AdsStream(IncrementalAdsStream):
@@ -67,7 +70,7 @@ class AdsStream(IncrementalAdsStream):
     creative_batch_size = 20
     creative_subrequest_limit = 50
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:  # noqa: D107
         super().__init__(*args, **kwargs)
         # Buffer up to 20 creatives per subrequest and 50 subrequests per Graph batch
         self._creative_ids_buffer = BufferDeque(
@@ -75,8 +78,10 @@ class AdsStream(IncrementalAdsStream):
         )
         self._creative_account: str | None = None
 
-    def _get_creative_stream(self) -> CreativeStream | None:
+    def _get_creative_stream(self):  # noqa: ANN202
         """Return the creatives child stream instance if selected."""
+        from tap_facebook.streams.creative import CreativeStream  # noqa: PLC0415
+
         for child_stream in self.child_streams:
             if isinstance(child_stream, CreativeStream) and (
                 child_stream.selected or child_stream.has_selected_descendents
