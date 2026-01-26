@@ -333,18 +333,11 @@ class AdsetsStream(IncrementalAdsStream):
         """Use larger page size for ads without affecting other streams."""
         params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
         statuses = [
-            "ACTIVE",
             "PAUSED",
-            "DELETED",
-            "PENDING_REVIEW",
-            "DISAPPROVED",
-            "PREAPPROVED",
-            "PENDING_BILLING_INFO",
             "CAMPAIGN_PAUSED",
-            "ARCHIVED",
-            "ADSET_PAUSED",
-            "IN_PROCESS",
+            "ACTIVE",
             "WITH_ISSUES",
+            "ARCHIVED",
         ]
         params["effective_status"] = json.dumps(statuses)
         return params
