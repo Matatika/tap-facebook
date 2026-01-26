@@ -216,6 +216,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {"limit": 25}
+        params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
         if context and "_since":
             params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
                 tzinfo=timezone.utc).timestamp())
