@@ -181,6 +181,7 @@ class AdsStream(IncrementalAdsStream):
     ) -> dict[str, t.Any]:
         """Use larger page size for ads without affecting other streams."""
         params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
+        params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
         params["limit"] = 1000
         return params
 
