@@ -97,7 +97,7 @@ class AdVideos(FacebookStream):
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": 200, "fields": ",".join(self.columns)}
+        params: dict = {"limit": 50, "fields": ",".join(self.columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
