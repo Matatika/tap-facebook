@@ -7,7 +7,10 @@ import typing as t
 from dateutil import parser
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
+    ArrayType,
     DateTimeType,
+    NumberType,
+    ObjectType,
     PropertiesList,
     Property,
     StringType,
@@ -40,6 +43,11 @@ class AdVideos(FacebookStream):
         "created_time",
         "title",
         "description",
+        "permalink_url",
+        "embed_html",
+        "format",
+        "source",
+        "length",
     ]
 
     name = "advideos"
@@ -56,6 +64,22 @@ class AdVideos(FacebookStream):
         Property("account_id", StringType),
         Property("title", StringType),
         Property("description", StringType),
+        Property("permalink_url", StringType),
+        Property("embed_html", StringType),
+        Property(
+            "format",
+            ArrayType(
+                ObjectType(
+                    Property("embed_html", StringType),
+                    Property("filter", StringType),
+                    Property("height", NumberType),
+                    Property("picture", StringType),
+                    Property("width", NumberType),
+                )
+            ),
+        ),
+        Property("source", StringType),
+        Property("length", NumberType),
     ).to_dict()
 
     @property
@@ -73,7 +97,7 @@ class AdVideos(FacebookStream):
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": 200, "fields": ",".join(self.columns)}
+        params: dict = {"limit": 50, "fields": ",".join(self.columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -117,4 +141,3 @@ class AdVideos(FacebookStream):
         with self.video_ids_buffer as buf:
             if buf.flush:
                 yield {"video_ids": buf}
-
