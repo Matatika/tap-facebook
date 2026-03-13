@@ -14,7 +14,6 @@ from facebook_business.adobjects.adsactionstats import AdsActionStats
 from facebook_business.adobjects.adshistogramstats import AdsHistogramStats
 from facebook_business.adobjects.adsinsights import AdsInsights
 from facebook_business.api import FacebookAdsApi
-from facebook_business.exceptions import FacebookRequestError
 from singer_sdk import typing as th
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL, Stream
 
@@ -70,7 +69,6 @@ INSIGHTS_MAX_WAIT_TO_FINISH_SECONDS = 30 * 60
 MAX_RETRIES_START = 3
 MAX_RETRIES_FINISH = 2
 WAIT_BETWEEN_RETRIES = 30  # seconds
-HTTP_SERVER_ERROR_STATUS = 500
 
 
 class AdsInsightStream(Stream):
@@ -367,26 +365,9 @@ class AdsInsightStream(Stream):
                     report_end,
                 )
                 continue
-            try:
+            else:
                 for obj in job.get_result():
                     yield obj.export_all_data()
-            except FacebookRequestError as err:
-                status = err.http_status()
-                is_transient = bool(err.api_transient_error())
-                if status >= HTTP_SERVER_ERROR_STATUS or is_transient:
-                    self.logger.warning(
-                        (
-                            "Skipping account %s time range %s-%s due to transient "
-                            "insights pagination error (status=%s): %s"
-                        ),
-                        account_id,
-                        report_start,
-                        report_end,
-                        status,
-                        err,
-                    )
-                else:
-                    raise
             # Bump to the next increment
             report_start = report_start.add(days=time_increment)
             report_end = report_end.add(days=time_increment)
