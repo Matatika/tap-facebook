@@ -84,7 +84,19 @@ class AdsInsightStream(Stream):
 
     @property
     def primary_keys(self) -> t.Sequence[str]:
-        return ["date_start", "account_id", "ad_id"] + self._report_definition["breakdowns"]
+        level = self._report_definition.get("level", "ad")
+        entity_key = {
+            "campaign": "campaign_id",
+            "adset": "adset_id",
+            "ad": "ad_id",
+        }.get(level, "ad_id")
+
+        return [
+            "date_start",
+            "account_id",
+            entity_key,
+            *self._report_definition["breakdowns"],
+        ]
 
     @primary_keys.setter
     def primary_keys(self, new_value: t.Sequence[str] | None) -> None:

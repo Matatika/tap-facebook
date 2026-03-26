@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import typing as t
 
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
@@ -172,6 +173,17 @@ class AdsStream(IncrementalAdsStream):
         version = self.config["api_version"]
         account_id = context["_current_account_id"]
         return f"https://graph.facebook.com/{version}/act_{account_id}/ads?fields={self.columns}"
+
+    def get_url_params(
+        self,
+        context: dict | None,
+        next_page_token: t.Any | None,  # noqa: ANN401
+    ) -> dict[str, t.Any]:
+        """Use larger page size for ads without affecting other streams."""
+        params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
+        params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
+        params["limit"] = 1000
+        return params
 
     def generate_child_contexts(
     self,
