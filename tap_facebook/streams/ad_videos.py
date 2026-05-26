@@ -18,6 +18,8 @@ from singer_sdk.typing import (
 from typing_extensions import override
 
 from tap_facebook import BufferDeque
+from singer_sdk.exceptions import RetriableAPIError
+
 from tap_facebook.client import FacebookStream, SkipAccountError
 
 if t.TYPE_CHECKING:
@@ -97,7 +99,7 @@ class AdVideos(FacebookStream):
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": self.config.get("limit", 50), "fields": ",".join(self.columns)}
+        params: dict = {"limit": self._current_limit, "fields": ",".join(self.columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -126,6 +128,22 @@ class AdVideos(FacebookStream):
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         super().__init__(*args, **kwargs)
         self.video_ids_buffer = BufferDeque(maxlen=20)
+        self._current_limit: int = self.config.get("limit", 50)
+
+    @override
+    def validate_response(self, response: requests.Response) -> None:
+        if (
+            response.status_code == 500
+            and "please reduce the amount of data" in str(response.content).lower()
+        ):
+            self._current_limit = max(50, self._current_limit - 100)
+            self.logger.warning(
+                "Response too large; reducing limit to %s and retrying.",
+                self._current_limit,
+            )
+            msg = f"500 Server Error: data too large, retrying with limit={self._current_limit}"
+            raise RetriableAPIError(msg, response)
+        super().validate_response(response)
 
     @override
     def parse_response(self, response: requests.Response) -> t.Iterator[dict]:
