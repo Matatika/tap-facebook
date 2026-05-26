@@ -201,6 +201,12 @@ class TapFacebook(Tap):
             th.DateTimeType,
             description="The latest record date to sync",
         ),
+        th.Property(
+            "limit",
+            th.IntegerType,
+            description="Page size limit for API requests.",
+            default=50,
+        ),
     ).to_dict()
 
     def discover_streams(self) -> list[FacebookStream | AdsInsightStream]:
