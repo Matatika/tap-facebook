@@ -99,7 +99,13 @@ class AdVideos(FacebookStream):
         context: Context | None,  # noqa: ARG002
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": self._current_limit, "fields": ",".join(self.columns)}
+        configured = self.config.get("columns") or []
+        columns = list(configured) if configured else list(self.columns)
+        # id and updated_time are always required
+        for required in ("id", "updated_time"):
+            if required not in columns:
+                columns.append(required)
+        params: dict = {"limit": self._current_limit, "fields": ",".join(columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
