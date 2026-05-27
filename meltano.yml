@@ -23,6 +23,13 @@ plugins:
       kind: array
     - name: api_version
       value: 'v23.0'
+    - name: insight_reports_list
+      kind: array
+    - name: limit
+      kind: integer
+      value: 50
+    - name: columns
+      kind: array
   loaders:
   - name: target-jsonl
     variant: andyh1203
