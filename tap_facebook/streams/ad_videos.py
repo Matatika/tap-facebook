@@ -96,16 +96,23 @@ class AdVideos(FacebookStream):
 
     def get_url_params(
         self,
-        context: Context | None,  # noqa: ARG002
+        context: Context | None,
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
+        account_id = context["_current_account_id"] if context else None
+        self._current_account_id = account_id
+        if account_id and account_id not in self._account_limits:
+            self._account_limits[account_id] = self.config.get("limit", 50)
+
+        current_limit = self._account_limits.get(account_id, self.config.get("limit", 50))
+
         configured = self.config.get("columns") or []
         columns = list(configured) if configured else list(self.columns)
         # id and updated_time are always required
         for required in ("id", "updated_time"):
             if required not in columns:
                 columns.append(required)
-        params: dict = {"limit": self._current_limit, "fields": ",".join(columns)}
+        params: dict = {"limit": current_limit, "fields": ",".join(columns)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -119,6 +126,8 @@ class AdVideos(FacebookStream):
     ) -> t.Iterable[dict | tuple[dict, dict | None]]:
         bookmark = self.get_starting_timestamp(context)
         account_id = context["_current_account_id"]
+        # Reset limit to config value for each new account
+        self._account_limits[account_id] = self.config.get("limit", 50)
         try:
             for record in super().get_records(context):
                 record["account_id"] = account_id
@@ -134,7 +143,7 @@ class AdVideos(FacebookStream):
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         super().__init__(*args, **kwargs)
         self.video_ids_buffer = BufferDeque(maxlen=20)
-        self._current_limit: int = self.config.get("limit", 50)
+        self._account_limits: dict[str, int] = {}
 
     @override
     def validate_response(self, response: requests.Response) -> None:
@@ -142,12 +151,17 @@ class AdVideos(FacebookStream):
             response.status_code == 500
             and "please reduce the amount of data" in str(response.content).lower()
         ):
-            self._current_limit = max(50, self._current_limit - 100)
+            account_id = getattr(self, "_current_account_id", None)
+            if account_id:
+                self._account_limits[account_id] = max(50, self._account_limits.get(account_id, 50) - 100)
+                new_limit = self._account_limits[account_id]
+            else:
+                new_limit = 50
             self.logger.warning(
                 "Response too large; reducing limit to %s and retrying.",
-                self._current_limit,
+                new_limit,
             )
-            msg = f"500 Server Error: data too large, retrying with limit={self._current_limit}"
+            msg = f"500 Server Error: data too large, retrying with limit={new_limit}"
             raise RetriableAPIError(msg, response)
         super().validate_response(response)
 
