@@ -28,8 +28,6 @@ plugins:
     - name: limit
       kind: integer
       value: 50
-    - name: columns
-      kind: array
   loaders:
   - name: target-jsonl
     variant: andyh1203
