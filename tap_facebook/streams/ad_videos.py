@@ -99,19 +99,18 @@ class AdVideos(FacebookStream):
         context: Context | None,
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        account_id = context["_current_account_id"] if context else None
-        self._current_account_id = account_id
-        if account_id and account_id not in self._account_limits:
-            self._account_limits[account_id] = self.config.get("limit", 50)
-
-        current_limit = self._account_limits.get(account_id, self.config.get("limit", 50))
         fields = {
             c
             for c in self.columns
             if (m := self.metadata[("properties", c)]).selected is not False
             or m.inclusion == Metadata.InclusionType.AUTOMATIC
         }
-        params: dict = {"limit": current_limit, "fields": ",".join(fields)}
+
+        params: dict = {
+            "limit": self._account_limits[context["_current_account_id"]],
+            "fields": ",".join(fields),
+        }
+
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -126,7 +125,7 @@ class AdVideos(FacebookStream):
         bookmark = self.get_starting_timestamp(context)
         account_id = context["_current_account_id"]
         # Reset limit to config value for each new account
-        self._account_limits[account_id] = self.config.get("limit", 50)
+        self._account_limits.setdefault(account_id, self.config["limit"])
         try:
             for record in super().get_records(context):
                 record["account_id"] = account_id
@@ -150,12 +149,10 @@ class AdVideos(FacebookStream):
             response.status_code == 500
             and "please reduce the amount of data" in str(response.content).lower()
         ):
-            account_id = getattr(self, "_current_account_id", None)
-            if account_id:
-                self._account_limits[account_id] = max(50, self._account_limits.get(account_id, 50) - 100)
-                new_limit = self._account_limits[account_id]
-            else:
-                new_limit = 50
+            account_id = self.context["_current_account_id"]
+            new_limit = self._account_limits[account_id] // 2  # divide by 2 and floor
+            self._account_limits[account_id] = new_limit
+
             self.logger.warning(
                 "Response too large; reducing limit to %s and retrying.",
                 new_limit,
