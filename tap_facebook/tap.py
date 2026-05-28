@@ -207,12 +207,6 @@ class TapFacebook(Tap):
             description="Page size limit for API requests.",
             default=50,
         ),
-        th.Property(
-            "columns",
-            th.ArrayType(th.StringType),
-            description="Fields to fetch from the API. Defaults to all schema fields.",
-            default=[],
-        ),
     ).to_dict()
 
     def discover_streams(self) -> list[FacebookStream | AdsInsightStream]:

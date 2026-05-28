@@ -5,6 +5,8 @@ from __future__ import annotations
 import typing as t
 
 from dateutil import parser
+from singer_sdk.exceptions import RetriableAPIError
+from singer_sdk.singerlib.catalog import Metadata
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -18,8 +20,6 @@ from singer_sdk.typing import (
 from typing_extensions import override
 
 from tap_facebook import BufferDeque
-from singer_sdk.exceptions import RetriableAPIError
-
 from tap_facebook.client import FacebookStream, SkipAccountError
 
 if t.TYPE_CHECKING:
@@ -77,7 +77,7 @@ class AdVideos(FacebookStream):
                     Property("height", NumberType),
                     Property("picture", StringType),
                     Property("width", NumberType),
-                )
+                ),
             ),
         ),
         Property("source", StringType),
@@ -105,14 +105,13 @@ class AdVideos(FacebookStream):
             self._account_limits[account_id] = self.config.get("limit", 50)
 
         current_limit = self._account_limits.get(account_id, self.config.get("limit", 50))
-
-        configured = self.config.get("columns") or []
-        columns = list(configured) if configured else list(self.columns)
-        # id and updated_time are always required
-        for required in ("id", "updated_time"):
-            if required not in columns:
-                columns.append(required)
-        params: dict = {"limit": current_limit, "fields": ",".join(columns)}
+        fields = {
+            c
+            for c in self.columns
+            if (m := self.metadata[("properties", c)]).selected is not False
+            or m.inclusion == Metadata.InclusionType.AUTOMATIC
+        }
+        params: dict = {"limit": current_limit, "fields": ",".join(fields)}
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
