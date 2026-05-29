@@ -5,6 +5,8 @@ from __future__ import annotations
 import typing as t
 
 from dateutil import parser
+from singer_sdk.exceptions import RetriableAPIError
+from singer_sdk.singerlib.catalog import Metadata
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -75,7 +77,7 @@ class AdVideos(FacebookStream):
                     Property("height", NumberType),
                     Property("picture", StringType),
                     Property("width", NumberType),
-                )
+                ),
             ),
         ),
         Property("source", StringType),
@@ -94,10 +96,21 @@ class AdVideos(FacebookStream):
 
     def get_url_params(
         self,
-        context: Context | None,  # noqa: ARG002
+        context: Context | None,
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        params: dict = {"limit": 50, "fields": ",".join(self.columns)}
+        fields = {
+            c
+            for c in self.columns
+            if (m := self.metadata[("properties", c)]).selected is not False
+            or m.inclusion == Metadata.InclusionType.AUTOMATIC
+        }
+
+        params: dict = {
+            "limit": self._account_limits[context["_current_account_id"]],
+            "fields": ",".join(fields),
+        }
+
         if next_page_token is not None:
             params["after"] = next_page_token
         if self.replication_key:
@@ -111,6 +124,8 @@ class AdVideos(FacebookStream):
     ) -> t.Iterable[dict | tuple[dict, dict | None]]:
         bookmark = self.get_starting_timestamp(context)
         account_id = context["_current_account_id"]
+        # Reset limit to config value for each new account
+        self._account_limits.setdefault(account_id, self.config["limit"])
         try:
             for record in super().get_records(context):
                 record["account_id"] = account_id
@@ -126,6 +141,25 @@ class AdVideos(FacebookStream):
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         super().__init__(*args, **kwargs)
         self.video_ids_buffer = BufferDeque(maxlen=20)
+        self._account_limits: dict[str, int] = {}
+
+    @override
+    def validate_response(self, response: requests.Response) -> None:
+        if (
+            response.status_code == 500
+            and "please reduce the amount of data" in str(response.content).lower()
+        ):
+            account_id = self.context["_current_account_id"]
+            new_limit = self._account_limits[account_id] // 2  # divide by 2 and floor
+            self._account_limits[account_id] = new_limit
+
+            self.logger.warning(
+                "Response too large; reducing limit to %s and retrying.",
+                new_limit,
+            )
+            msg = f"500 Server Error: data too large, retrying with limit={new_limit}"
+            raise RetriableAPIError(msg, response)
+        super().validate_response(response)
 
     @override
     def parse_response(self, response: requests.Response) -> t.Iterator[dict]:
