@@ -149,7 +149,7 @@ class AdVideos(FacebookStream):
             response.status_code == 500
             and "please reduce the amount of data" in str(response.content).lower()
         ):
-            account_id = self.context["_current_account_id"]
+            account_id = response.request.path_url.split("/", 3)[-2].removeprefix("act_")
             new_limit = self._account_limits[account_id] // 2  # divide by 2 and floor
             self._account_limits[account_id] = new_limit
 
