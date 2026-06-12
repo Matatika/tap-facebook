@@ -25,6 +25,9 @@ from tap_facebook.streams import (
     CreativeStream,
     CustomAudiences,
     CustomConversions,
+    PageVideosStream,
+    PagesStream,
+    VideoSourceStream,
 )
 
 STREAM_TYPES = [
@@ -41,6 +44,11 @@ STREAM_TYPES = [
     AdVideos,
     AdTrackingStream,
     AdRecommendationsStream,
+    PagesStream,
+    PageVideosStream,
+    AdsStream,
+    CreativeStream,
+    VideoSourceStream,
 ]
 
 DEFAULT_INSIGHT_REPORT = {
@@ -217,7 +225,7 @@ class TapFacebook(Tap):
         """
         streams = [stream_class(tap=self) for stream_class in STREAM_TYPES]
         report_configs = [  # type: ignore[misc]
-            DEFAULT_INSIGHT_REPORT,
+            #DEFAULT_INSIGHT_REPORT,
             *self.config.get("insight_reports_list"),
         ]
         insight_streams = [

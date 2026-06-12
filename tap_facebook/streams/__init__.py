@@ -14,6 +14,9 @@ from tap_facebook.streams.campaign import CampaignStream
 from tap_facebook.streams.creative import CreativeStream
 from tap_facebook.streams.custom_audiences import CustomAudiences
 from tap_facebook.streams.custom_conversions import CustomConversions
+from tap_facebook.streams.page_videos import PageVideosStream
+from tap_facebook.streams.pages import PagesStream
+from tap_facebook.streams.video_source import VideoSourceStream
 
 __all__ = [
     "AdAccountsStream",
@@ -30,4 +33,7 @@ __all__ = [
     "CreativeStream",
     "CustomAudiences",
     "CustomConversions",
+    "PageVideosStream",
+    "PagesStream",
+    "VideoSourceStream",
 ]
