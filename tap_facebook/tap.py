@@ -27,7 +27,6 @@ from tap_facebook.streams import (
     CustomConversions,
     PageVideosStream,
     PagesStream,
-    VideoSourceStream,
 )
 
 STREAM_TYPES = [
@@ -48,7 +47,6 @@ STREAM_TYPES = [
     PageVideosStream,
     AdsStream,
     CreativeStream,
-    VideoSourceStream,
 ]
 
 DEFAULT_INSIGHT_REPORT = {
