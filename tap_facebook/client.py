@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from urllib.parse import urlparse
 
+import backoff
 import pendulum
 from singer_sdk.authenticators import BearerTokenAuthenticator
 from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
@@ -147,14 +148,10 @@ class FacebookStream(RESTStream):
             raise SkipAccountError(msg)
 
     def backoff_max_tries(self) -> int:
-        """The number of attempts before giving up when retrying requests.
-
-        Setting to None will retry indefinitely.
-
-        Returns:
-            int: limit
-        """
         return 20
+
+    def backoff_wait_generator(self) -> t.Callable[..., t.Generator]:
+        return backoff.constant(interval=30)
 
 class SkipAccountError(Exception):
     """Raised when an account should be skipped due to a server error."""

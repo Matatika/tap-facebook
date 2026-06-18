@@ -18,6 +18,13 @@ from singer_sdk.typing import (
 
 from tap_facebook.client import IncrementalAdsStream
 
+if t.TYPE_CHECKING:
+    import requests
+
+
+class _ReduceLimitError(Exception):
+    """Raised when Facebook returns 500 due to too much data; signals restart with lower limit."""
+
 
 class AdsStream(IncrementalAdsStream):
     """Ads stream class.
@@ -165,6 +172,10 @@ class AdsStream(IncrementalAdsStream):
 
     tap_stream_id = "ads"
 
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        self._account_limits: dict[str, int] = {}
+
     @property
     def partitions(self) -> list[dict[str, t.Any]]:
         return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
@@ -179,11 +190,34 @@ class AdsStream(IncrementalAdsStream):
         context: dict | None,
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
-        """Use larger page size for ads without affecting other streams."""
+        account_id = context["_current_account_id"]
+        self._account_limits.setdefault(account_id, 1000)
         params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
         params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
-        params["limit"] = 1000
+        params["limit"] = self._account_limits[account_id]
         return params
+
+    def validate_response(self, response: requests.Response) -> None:
+        if (
+            response.status_code == 500
+            and "please reduce the amount of data" in str(response.content).lower()
+        ):
+            raise _ReduceLimitError
+        super().validate_response(response)
+
+    def get_records(self, context: dict | None) -> t.Iterable[dict]:
+        while True:
+            try:
+                yield from super().get_records(context)
+                break
+            except _ReduceLimitError:
+                account_id = context["_current_account_id"]
+                new_limit = self._account_limits[account_id] // 2
+                self._account_limits[account_id] = new_limit
+                self.logger.warning(
+                    "Response too large; reducing limit to %s and retrying.",
+                    new_limit,
+                )
 
     def generate_child_contexts(
     self,
