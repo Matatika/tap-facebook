@@ -51,7 +51,7 @@ class AdsStream(IncrementalAdsStream):
         "effective_status",
         "last_updated_by_app_id",
         "source_ad_id",
-        "creative",
+        "creative{id,effective_object_story_id,video_id}",
         "tracking_specs",
         "conversion_specs",
         "recommendations",
@@ -91,7 +91,12 @@ class AdsStream(IncrementalAdsStream):
         Property("status", StringType),
         Property(
             "creative",
-            ObjectType(Property("creative_id", StringType), Property("id", StringType)),
+            ObjectType(
+                Property("creative_id", StringType),
+                Property("id", StringType),
+                Property("effective_object_story_id", StringType),
+                Property("video_id", StringType),
+            ),
         ),
         Property("id", StringType),
         Property("updated_time", DateTimeType),

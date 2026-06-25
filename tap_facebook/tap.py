@@ -23,15 +23,15 @@ from tap_facebook.streams import (
     AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
+    CreativeVideoStream,
     CustomAudiences,
-    CustomConversions,
-    PageVideosStream,
-    PagesStream,
+    CustomConversions
 )
 
 STREAM_TYPES = [
     AdsetsStream,
     AdsStream,
+    CreativeVideoStream,
     AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
@@ -42,11 +42,7 @@ STREAM_TYPES = [
     AdImages,
     AdVideos,
     AdTrackingStream,
-    AdRecommendationsStream,
-    PagesStream,
-    PageVideosStream,
-    AdsStream,
-    CreativeStream,
+    AdRecommendationsStream
 ]
 
 DEFAULT_INSIGHT_REPORT = {
@@ -212,6 +208,12 @@ class TapFacebook(Tap):
             th.IntegerType,
             description="Page size limit for API requests.",
             default=50,
+        ),
+        th.Property(
+            "page_ids",
+            th.ArrayType(th.StringType),
+            description="Explicit list of page IDs to sync. If set, skips promote_pages discovery.",
+            default=[],
         ),
     ).to_dict()
 
