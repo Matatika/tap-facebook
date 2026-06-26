@@ -61,6 +61,7 @@ class CreativeVideoStream(FacebookStream):
         self._page_token_cache: dict[str, str] = {}
         self._current_page_id: str | None = None
         self._me_accounts_fetched = False
+        self._seen_video_ids: set[str] = set()
 
     @property
     def authenticator(self) -> BearerTokenAuthenticator:
@@ -139,6 +140,10 @@ class CreativeVideoStream(FacebookStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         if not context or not context.get("video_id"):
             return
+        video_id = context["video_id"]
+        if video_id in self._seen_video_ids:
+            return
+        self._seen_video_ids.add(video_id)
         page_id = context.get("page_id")
         if page_id:
             self._current_page_id = page_id
