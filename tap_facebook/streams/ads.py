@@ -246,7 +246,7 @@ class AdsStream(IncrementalAdsStream):
         # Context for creative_videos child stream
         creative = record.get("creative", {})
         if creative.get("video_id"):
-            child: dict = {**base_context, "video_id": creative["video_id"]}
+            child: dict = {**base_context, "video_id": creative["video_id"], "_child_type": "creative_video"}
             # effective_object_story_id format: "{page_id}_{post_id}"
             story_id = creative.get("effective_object_story_id", "")
             if "_" in story_id:

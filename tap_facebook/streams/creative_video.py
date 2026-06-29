@@ -138,7 +138,7 @@ class CreativeVideoStream(FacebookStream):
             yield data
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        if not context or not context.get("video_id"):
+        if not context or context.get("_child_type") != "creative_video":
             return
         video_id = context["video_id"]
         if video_id in self._seen_video_ids:
