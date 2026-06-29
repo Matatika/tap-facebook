@@ -239,11 +239,4 @@ class CreativeStream(FacebookStream):
             return []
         yield from super().get_records(context)
 
-    def generate_child_contexts(
-        self,
-        record: dict,
-        context: dict | None = None,  # noqa: ARG002
-    ) -> t.Iterable[dict]:
-        if record.get("video_id"):
-            yield {"video_id": record["video_id"]}
 
