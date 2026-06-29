@@ -25,9 +25,8 @@ from tap_facebook.streams import (
     CreativeStream,
     CreativeVideoStream,
     CustomAudiences,
-    CustomConversions
+    CustomConversions,
 )
-
 STREAM_TYPES = [
     AdsetsStream,
     AdsStream,
@@ -42,7 +41,7 @@ STREAM_TYPES = [
     AdImages,
     AdVideos,
     AdTrackingStream,
-    AdRecommendationsStream
+    AdRecommendationsStream,
 ]
 
 DEFAULT_INSIGHT_REPORT = {
