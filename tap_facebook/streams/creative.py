@@ -238,5 +238,3 @@ class CreativeStream(FacebookStream):
         if not context or context.get("_child_type") != "creative":
             return []
         yield from super().get_records(context)
-
-
