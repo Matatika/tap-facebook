@@ -209,12 +209,6 @@ class TapFacebook(Tap):
             description="Page size limit for API requests.",
             default=50,
         ),
-        th.Property(
-            "page_ids",
-            th.ArrayType(th.StringType),
-            description="Explicit list of page IDs to sync. If set, skips promote_pages discovery.",
-            default=[],
-        ),
     ).to_dict()
 
     def discover_streams(self) -> list[FacebookStream | AdsInsightStream]:
@@ -225,7 +219,7 @@ class TapFacebook(Tap):
         """
         streams = [stream_class(tap=self) for stream_class in STREAM_TYPES]
         report_configs = [  # type: ignore[misc]
-            #DEFAULT_INSIGHT_REPORT,
+            DEFAULT_INSIGHT_REPORT,
             *self.config.get("insight_reports_list"),
         ]
         insight_streams = [
