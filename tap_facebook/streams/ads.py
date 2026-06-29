@@ -51,7 +51,7 @@ class AdsStream(IncrementalAdsStream):
         "effective_status",
         "last_updated_by_app_id",
         "source_ad_id",
-        "creative",
+        "creative{id,effective_object_story_id,video_id}",
         "tracking_specs",
         "conversion_specs",
         "recommendations",
@@ -91,7 +91,12 @@ class AdsStream(IncrementalAdsStream):
         Property("status", StringType),
         Property(
             "creative",
-            ObjectType(Property("creative_id", StringType), Property("id", StringType)),
+            ObjectType(
+                Property("creative_id", StringType),
+                Property("id", StringType),
+                Property("effective_object_story_id", StringType),
+                Property("video_id", StringType),
+            ),
         ),
         Property("id", StringType),
         Property("updated_time", DateTimeType),
@@ -237,6 +242,16 @@ class AdsStream(IncrementalAdsStream):
                 "creative_id": record["creative"]["id"],
                 "_child_type": "creative",
             }
+
+        # Context for creative_videos child stream
+        creative = record.get("creative", {})
+        if creative.get("video_id"):
+            child: dict = {**base_context, "video_id": creative["video_id"], "_child_type": "creative_video"}
+            # effective_object_story_id format: "{page_id}_{post_id}"
+            story_id = creative.get("effective_object_story_id", "")
+            if "_" in story_id:
+                child["page_id"] = story_id.split("_")[0]
+            yield child
 
         # Context(s) for recommendations child stream
         for recommendation in record.get("recommendations", []):

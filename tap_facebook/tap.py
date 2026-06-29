@@ -23,13 +23,14 @@ from tap_facebook.streams import (
     AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
+    CreativeVideoStream,
     CustomAudiences,
     CustomConversions,
 )
-
 STREAM_TYPES = [
     AdsetsStream,
     AdsStream,
+    CreativeVideoStream,
     AdVideoThumbnails,
     CampaignStream,
     CreativeStream,
