@@ -197,6 +197,8 @@ class IncrementalFacebookStream(FacebookStream, metaclass=abc.ABCMeta):
 
 class IncrementalAdsStream(IncrementalFacebookStream):
     """Incremental ads stream class."""
+    
+    time_increment: int = 7
 
     def get_url_params(
         self,
@@ -260,7 +262,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         context: Context | None,
     ) -> t.Iterable[dict | tuple[dict, dict | None]]:
         """Yield records in smaller date chunks using since/until (7 days by default)."""
-        time_increment = 7  # fixed at 7-day chunks
+        time_increment = self.time_increment
 
         sync_end_date = pendulum.parse(
             self.config.get("end_date", pendulum.today().to_date_string()),
@@ -270,6 +272,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         report_start = self._get_start_date(context)
         report_end = min(report_start.add(days=time_increment),today)
         account_id = context["_current_account_id"]
+        self._last_window_end = None
         while report_start <= sync_end_date:
             # Add the current window into the context
             chunk_context = dict(context or {})
@@ -282,12 +285,12 @@ class IncrementalAdsStream(IncrementalFacebookStream):
                 chunk_context["_since"],
                 chunk_context["_until"],
             )
-            self._last_window_end = sync_end_date
             try:
                 yield from super().get_records(chunk_context)
             except SkipAccountError as e:
                 self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
                 return  # stops this account, continues next partition
+            self._last_window_end = min(report_end, sync_end_date)
 
             # bump the window forward
             report_start = report_end.add(days=1)
@@ -297,7 +300,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         if state is not None:
             state.setdefault("replication_key", self.replication_key)
             # use the window end instead of last record's updated_time
-            if hasattr(self, "_last_window_end"):
+            if self._last_window_end is not None:
                 state["replication_key_value"] = (
                     self._last_window_end - timedelta(days=1)
                 ).isoformat()
