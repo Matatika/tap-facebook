@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import typing as t
 
+import pendulum
+
 from singer_sdk.streams.core import REPLICATION_INCREMENTAL
 from singer_sdk.typing import (
     ArrayType,
@@ -16,7 +18,7 @@ from singer_sdk.typing import (
     StringType,
 )
 
-from tap_facebook.client import IncrementalAdsStream
+from tap_facebook.client import IncrementalAdsStream, SkipAccountError
 
 if t.TYPE_CHECKING:
     import requests
@@ -211,18 +213,66 @@ class AdsStream(IncrementalAdsStream):
         super().validate_response(response)
 
     def get_records(self, context: dict | None) -> t.Iterable[dict]:
-        while True:
+        sync_end_date = pendulum.parse(
+            self.config.get("end_date", pendulum.today().to_date_string()),
+        ).date()
+        today = pendulum.today("UTC").date()
+        report_start = self._get_start_date(context)
+        account_id = context["_current_account_id"]
+
+        # Start with one chunk covering the full remaining range
+        effective_end = min(sync_end_date, today)
+        time_increment = max((effective_end - report_start).days, 1)
+
+        self._last_window_end = None
+        while report_start <= sync_end_date:
+            report_end = min(report_start.add(days=time_increment), today, sync_end_date)
+            chunk_context = {
+                **context,
+                "_since": report_start.to_date_string(),
+                "_until": report_end.to_date_string(),
+            }
+            self.logger.info(
+                "Fetching records for account %s from %s to %s (chunk=%d days)",
+                account_id,
+                chunk_context["_since"],
+                chunk_context["_until"],
+                time_increment,
+            )
             try:
-                yield from super().get_records(context)
-                break
+                yield from super(IncrementalAdsStream, self).get_records(chunk_context)
+            except SkipAccountError as e:
+                self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
+                return
             except _ReduceLimitError:
-                account_id = context["_current_account_id"]
-                new_limit = self._account_limits[account_id] // 2
-                self._account_limits[account_id] = new_limit
+                current_limit = self._account_limits[account_id]
+                if current_limit > 1:
+                    new_limit = max(current_limit // 2, 1)
+                    self._account_limits[account_id] = new_limit
+                    self.logger.warning(
+                        "Response too large for account %s; reducing limit to %d and retrying.",
+                        account_id,
+                        new_limit,
+                    )
+                    continue  # retry same chunk with smaller page limit
+                if time_increment > 1:
+                    time_increment = max(time_increment // 2, 1)
+                    self.logger.warning(
+                        "Limit already at minimum for account %s; halving time increment to %d days and retrying.",
+                        account_id,
+                        time_increment,
+                    )
+                    continue  # retry same chunk with smaller time window
                 self.logger.warning(
-                    "Response too large; reducing limit to %s and retrying.",
-                    new_limit,
+                    "Cannot reduce further for account %s; skipping chunk %s-%s.",
+                    account_id,
+                    report_start,
+                    report_end,
                 )
+                report_start = report_end.add(days=1)
+
+            self._last_window_end = min(report_end, sync_end_date)
+            report_start = report_end.add(days=1)
 
     def generate_child_contexts(
     self,
