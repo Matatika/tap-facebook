@@ -37,6 +37,8 @@ EXCLUDED_FIELDS = [
     "marketing_messages_cost_per_delivered",
     "marketing_messages_cost_per_link_btn_click",
     "marketing_messages_spend",
+    # Rejected by v23.0 as of 2026-07: "(#100) ... is not valid for fields param"
+    "marketing_messages_website_purchase_values",
     "place_page_name",
     "total_postbacks",
     "total_postbacks_detailed",
