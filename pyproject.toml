@@ -14,19 +14,19 @@ packages = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9"
+python = ">=3.10,<4.0"
 facebook-business = "~=21.0.3"
 pendulum = "~=3.1.0"
 requests = "~=2.32"
 
 [tool.poetry.dependencies."singer-sdk"]
-version = "~=0.47.0"
+version = "~=0.50.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2"
 
 [tool.poetry.group.dev.dependencies."singer-sdk"]
-version = "~=0.47.0"
+version = "~=0.50.0"
 extras = ["testing"]
 
 [tool.poetry.group.typing.dependencies]
@@ -51,7 +51,7 @@ enable = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 ignore = ["ANN101", "DJ", "PD", "D101", "D102"]
