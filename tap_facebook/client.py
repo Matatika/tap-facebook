@@ -196,9 +196,28 @@ class IncrementalFacebookStream(FacebookStream, metaclass=abc.ABCMeta):
         return params
 
 class IncrementalAdsStream(IncrementalFacebookStream):
-    """Incremental ads stream class."""
-    
+    """Incremental ads stream class.
+
+    Note on ordering: none of these edges support sorting -- ``sort`` and ``order_by``
+    are silently ignored (verified against v23.0). ``/act_*/ads`` and ``/adsets`` return
+    newest-first by ``updated_time``; ``/campaigns`` returns no discernible order at all.
+
+    Either way a sync that aborts partway holds an arbitrary subset rather than a
+    contiguous prefix, so there is no resumable midpoint and the bookmark must never be
+    advanced on an incomplete sync (see :meth:`_finalize_state`).
+    """
+
     time_increment: int = 7
+
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        # Sync outcome per account, keyed by account id (None when unpartitioned).
+        #
+        # This has to be keyed rather than held in scalars: the tap re-finalizes *every*
+        # partition at the end of the run, long after the instance has moved on to the
+        # last account. Scalars would apply the last account's outcome to all of them,
+        # which advances a failed account's bookmark if some later account succeeded.
+        self._partition_results: dict[str | None, dict[str, t.Any]] = {}
 
     def get_url_params(
         self,
@@ -215,16 +234,45 @@ class IncrementalAdsStream(IncrementalFacebookStream):
             A dictionary of URL query parameters.
         """
         params: dict = {"limit": 25}
-        if context and "_since":
+        if context and context.get("_since"):
             params["updated_since"] = int(datetime.strptime(context["_since"], "%Y-%m-%d").replace(
                 tzinfo=timezone.utc).timestamp())
         if next_page_token is not None:
             params["after"] = next_page_token
-        if self.replication_key:
-            params["sort"] = "asc"
-            params["order_by"] = self.replication_key
 
         return params
+
+    @staticmethod
+    def _account_id(context: Context | None) -> str | None:
+        return context.get("_current_account_id") if context else None
+
+    def _begin_partition(self, context: Context | None) -> None:
+        """Start tracking a partition's sync. Call at the top of ``get_records``."""
+        self._partition_results[self._account_id(context)] = {
+            "starting_bookmark": self.get_starting_replication_key_value(context),
+            "window_end": None,
+            "incomplete": False,
+        }
+
+    def _record_window_end(self, account_id: str | None, window_end: pendulum.Date) -> None:
+        """Record how far this account's sync has covered."""
+        self._partition_results[account_id]["window_end"] = window_end
+
+    def _mark_sync_incomplete(self, account_id: str | None, reason: str) -> None:
+        """Flag that this account did not cover its full range.
+
+        The bookmark is held back so the next run re-fetches the window instead of
+        silently stepping over the records that were never retrieved.
+        """
+        result = self._partition_results[account_id]
+        result["incomplete"] = True
+        self.logger.warning(
+            "Account %s sync incomplete (%s); holding bookmark at %s so the "
+            "unfetched records are retried on the next run.",
+            account_id,
+            reason,
+            result["starting_bookmark"],
+        )
 
     def _get_start_date(
         self,
@@ -272,7 +320,7 @@ class IncrementalAdsStream(IncrementalFacebookStream):
         report_start = self._get_start_date(context)
         report_end = min(report_start.add(days=time_increment),today)
         account_id = context["_current_account_id"]
-        self._last_window_end = None
+        self._begin_partition(context)
         while report_start <= sync_end_date:
             # Add the current window into the context
             chunk_context = dict(context or {})
@@ -288,21 +336,61 @@ class IncrementalAdsStream(IncrementalFacebookStream):
             try:
                 yield from super().get_records(chunk_context)
             except SkipAccountError as e:
-                self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
+                self._mark_sync_incomplete(account_id, f"server error: {e}")
                 return  # stops this account, continues next partition
-            self._last_window_end = min(report_end, sync_end_date)
+            self._record_window_end(account_id, min(report_end, sync_end_date))
 
             # bump the window forward
             report_start = report_end.add(days=1)
             report_end = report_start.add(days=time_increment)
 
+    def _is_partition_state(self, state: dict) -> bool:
+        """Whether ``state`` is one of this stream's partition states (vs. the root)."""
+        return any(state is partition for partition in self.stream_state.get("partitions", []))
+
+    def _result_for_state(self, state: dict) -> dict[str, t.Any] | None:
+        """The sync outcome that owns ``state``, or None if this state isn't ours to set.
+
+        For a partitioned stream the per-account states are the only authoritative
+        bookmarks -- the SDK never writes a stream-level one, and nothing reads it -- so
+        the root state is deliberately left alone.
+        """
+        if self._is_partition_state(state):
+            return self._partition_results.get(self._account_id(state.get("context")))
+        return None if self.partitions else self._partition_results.get(None)
+
     def _finalize_state(self, state: dict | None = None) -> dict | None:
-        if state is not None:
+        result = self._result_for_state(state) if state is not None else None
+        if result is not None:
             state.setdefault("replication_key", self.replication_key)
-            # use the window end instead of last record's updated_time
-            if self._last_window_end is not None:
+            if result["incomplete"]:
+                # The API returns records newest-first, so the SDK's max-based bookmark
+                # is set by the very first record of the very first page. Letting that
+                # stand after a partial sync would step the window past every record we
+                # never fetched. Roll back to where this run started instead.
+                self._discard_progress_markers(state)
+                if result["starting_bookmark"] is not None:
+                    state["replication_key_value"] = result["starting_bookmark"]
+                else:
+                    state.pop("replication_key_value", None)
+            elif result["window_end"] is not None:
+                # use the window end instead of last record's updated_time
+                self._discard_progress_markers(state)
                 state["replication_key_value"] = (
-                    self._last_window_end - timedelta(days=1)
+                    result["window_end"] - timedelta(days=1)
                 ).isoformat()
 
         return super()._finalize_state(state)
+
+    @staticmethod
+    def _discard_progress_markers(state: dict) -> None:
+        """Drop the SDK's max-based bookmark so this stream's own value survives.
+
+        The stream is unsorted, so the SDK parks max(replication_key) in the progress
+        markers, and ``super()._finalize_state()`` promotes that over anything we wrote.
+        The marker dict itself stays in place because the SDK indexes into it.
+        """
+        progress_markers = state.get("progress_markers")
+        if isinstance(progress_markers, dict):
+            progress_markers.pop("replication_key", None)
+            progress_markers.pop("replication_key_value", None)
