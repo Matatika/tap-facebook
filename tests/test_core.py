@@ -10,7 +10,7 @@ from tap_facebook.tap import TapFacebook
 SAMPLE_CONFIG = {
     "start_date": "2021-03-01T00:00:00Z",
     "access_token": os.environ["TAP_FACEBOOK_ACCESS_TOKEN"],
-    "account_id": os.environ["TAP_FACEBOOK_ACCOUNT_ID"],
+    "account_ids": [os.environ["TAP_FACEBOOK_ACCOUNT_ID"]],
 }
 
 TestTapFacebook = get_tap_test_class(
