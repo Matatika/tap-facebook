@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import typing as t
+from http import HTTPStatus
 
 import pendulum
 
@@ -24,8 +25,29 @@ if t.TYPE_CHECKING:
     import requests
 
 
+DEFAULT_PAGE_LIMIT = 1000
+
+
 class _ReduceLimitError(Exception):
     """Raised when Facebook returns 500 due to too much data; signals restart with lower limit."""
+
+
+def _is_volume_error(response: requests.Response) -> bool:
+    """Whether a 500 is Facebook failing to assemble an over-large page.
+
+    Two shapes show up on the ads edge. The explicit one asks us to reduce the amount
+    of data. The other is the generic ``code: 1 / error_subcode: 99`` "An unknown error
+    occurred", which is transient and also clears once the page is smaller -- treating
+    it as fatal abandons the account mid-pagination and drops every record that had
+    not been fetched yet.
+    """
+    if "please reduce the amount of data" in str(response.content).lower():
+        return True
+    try:
+        error = response.json().get("error", {})
+    except ValueError:
+        return False
+    return error.get("code") == 1 and error.get("error_subcode") == 99
 
 
 class AdsStream(IncrementalAdsStream):
@@ -198,7 +220,7 @@ class AdsStream(IncrementalAdsStream):
         next_page_token: t.Any | None,  # noqa: ANN401
     ) -> dict[str, t.Any]:
         account_id = context["_current_account_id"]
-        self._account_limits.setdefault(account_id, 1000)
+        self._account_limits.setdefault(account_id, DEFAULT_PAGE_LIMIT)
         params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
         params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
         params["limit"] = self._account_limits[account_id]
@@ -206,8 +228,8 @@ class AdsStream(IncrementalAdsStream):
 
     def validate_response(self, response: requests.Response) -> None:
         if (
-            response.status_code == 500
-            and "please reduce the amount of data" in str(response.content).lower()
+            response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+            and _is_volume_error(response)
         ):
             raise _ReduceLimitError
         super().validate_response(response)
@@ -219,12 +241,13 @@ class AdsStream(IncrementalAdsStream):
         today = pendulum.today("UTC").date()
         report_start = self._get_start_date(context)
         account_id = context["_current_account_id"]
+        self._account_limits.setdefault(account_id, DEFAULT_PAGE_LIMIT)
 
         # Start with one chunk covering the full remaining range
         effective_end = min(sync_end_date, today)
         time_increment = max((effective_end - report_start).days, 1)
 
-        self._last_window_end = None
+        self._begin_partition(context)
         while report_start <= sync_end_date:
             report_end = min(report_start.add(days=time_increment), today, sync_end_date)
             chunk_context = {
@@ -242,7 +265,7 @@ class AdsStream(IncrementalAdsStream):
             try:
                 yield from super(IncrementalAdsStream, self).get_records(chunk_context)
             except SkipAccountError as e:
-                self.logger.warning("Account %s skipped due to server error: %s", account_id, e)
+                self._mark_sync_incomplete(account_id, f"server error: {e}")
                 return
             except _ReduceLimitError:
                 current_limit = self._account_limits[account_id]
@@ -263,15 +286,14 @@ class AdsStream(IncrementalAdsStream):
                         time_increment,
                     )
                     continue  # retry same chunk with smaller time window
-                self.logger.warning(
-                    "Cannot reduce further for account %s; skipping chunk %s-%s.",
+                self._mark_sync_incomplete(
                     account_id,
-                    report_start,
-                    report_end,
+                    f"cannot reduce further; chunk {report_start}-{report_end} skipped",
                 )
                 report_start = report_end.add(days=1)
+                continue
 
-            self._last_window_end = min(report_end, sync_end_date)
+            self._record_window_end(account_id, min(report_end, sync_end_date))
             report_start = report_end.add(days=1)
 
     def generate_child_contexts(
