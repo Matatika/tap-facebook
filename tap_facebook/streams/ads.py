@@ -200,7 +200,21 @@ class AdsStream(IncrementalAdsStream):
         account_id = context["_current_account_id"]
         self._account_limits.setdefault(account_id, 1000)
         params: dict[str, t.Any] = super().get_url_params(context, next_page_token)
-        params["effective_status"] = json.dumps(["ACTIVE", "PAUSED", "ARCHIVED"])
+        params["effective_status"] = json.dumps(
+            [
+                "ACTIVE",
+                "PAUSED",
+                "ARCHIVED",
+                "ADSET_PAUSED",
+                "CAMPAIGN_PAUSED",
+                "PENDING_REVIEW",
+                "DISAPPROVED",
+                "PREAPPROVED",
+                "PENDING_BILLING_INFO",
+                "IN_PROCESS",
+                "WITH_ISSUES",
+            ],
+        )
         params["limit"] = self._account_limits[account_id]
         return params
 
