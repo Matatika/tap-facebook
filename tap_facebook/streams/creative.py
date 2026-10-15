@@ -19,13 +19,11 @@ from tap_facebook.streams.ads import AdsStream
 if t.TYPE_CHECKING:
     import requests
 
-# Facebook rejects reads of some Advantage+ (degrees-of-freedom) creatives whose
-# asset_feed_spec no longer matches their object_story_spec. Requesting the creative
-# without these fields succeeds, so we retry without them.
+# Facebook rejects reads of object_story_spec on some Advantage+ (degrees-of-freedom)
+# creatives whose asset_feed_spec no longer matches it. Every other field, including
+# asset_feed_spec and degrees_of_freedom_spec, can still be read, so we retry without it.
 DOF_MISMATCH_SUBCODE = "2446211"
-DOF_SPEC_FIELDS = frozenset(
-    {"asset_feed_spec", "degrees_of_freedom_spec", "object_story_spec"},
-)
+DOF_MISMATCH_FIELD = "object_story_spec"
 
 
 class CreativeStream(FacebookStream):
@@ -215,7 +213,7 @@ class CreativeStream(FacebookStream):
 
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         super().__init__(*args, **kwargs)
-        self._exclude_dof_spec_fields = False
+        self._exclude_object_story_spec = False
 
     @property
     def partitions(self) -> list[dict[str, t.Any]]:
@@ -232,8 +230,8 @@ class CreativeStream(FacebookStream):
     ) -> dict[str, str]:
         """Return query parameters for the request."""
         columns = self.columns
-        if self._exclude_dof_spec_fields:
-            columns = [column for column in columns if column not in DOF_SPEC_FIELDS]
+        if self._exclude_object_story_spec:
+            columns = [column for column in columns if column != DOF_MISMATCH_FIELD]
         params = {
             "fields": ",".join(columns),
         }
@@ -261,9 +259,9 @@ class CreativeStream(FacebookStream):
             self.logger.warning(
                 "Creative %s has mismatched degrees-of-freedom specs; retrying without %s",
                 context["creative_id"],
-                ", ".join(sorted(DOF_SPEC_FIELDS)),
+                DOF_MISMATCH_FIELD,
             )
-            self._exclude_dof_spec_fields = True
+            self._exclude_object_story_spec = True
             try:
                 yield from super().get_records(context)
             except FatalAPIError as retry_error:
@@ -271,4 +269,4 @@ class CreativeStream(FacebookStream):
                     "Skipping creative %s: %s", context["creative_id"], retry_error
                 )
             finally:
-                self._exclude_dof_spec_fields = False
+                self._exclude_object_story_spec = False

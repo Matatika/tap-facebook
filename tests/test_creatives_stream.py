@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from singer_sdk.exceptions import FatalAPIError
 
-from tap_facebook.streams.creative import DOF_SPEC_FIELDS, CreativeStream
+from tap_facebook.streams.creative import DOF_MISMATCH_FIELD, CreativeStream
 from tap_facebook.tap import TapFacebook
 
 BASE_CONFIG = {
@@ -37,20 +37,20 @@ def requested_fields(stream):
     return set(stream.get_url_params(None)["fields"].split(","))
 
 
-def test_spec_fields_requested_by_default():
+def test_object_story_spec_requested_by_default():
     stream = build_stream()
 
-    assert DOF_SPEC_FIELDS <= requested_fields(stream)
+    assert DOF_MISMATCH_FIELD in requested_fields(stream)
 
 
-def test_get_records_retries_without_spec_fields_on_dof_mismatch(monkeypatch):
+def test_get_records_retries_without_object_story_spec_on_dof_mismatch(monkeypatch):
     stream = build_stream()
     calls = []
 
     def fake_get_records(self, context):
         fields = requested_fields(self)
         calls.append(fields)
-        if DOF_SPEC_FIELDS & fields:
+        if DOF_MISMATCH_FIELD in fields:
             raise FatalAPIError(DOF_ERROR)
         yield {"id": context["creative_id"]}
 
@@ -58,11 +58,12 @@ def test_get_records_retries_without_spec_fields_on_dof_mismatch(monkeypatch):
 
     assert list(stream.get_records(creative_context())) == [{"id": "1111"}]
     assert len(calls) == 2
-    assert DOF_SPEC_FIELDS <= calls[0]
-    assert not DOF_SPEC_FIELDS & calls[1]
-    assert "id" in calls[1]
+    assert DOF_MISMATCH_FIELD in calls[0]
+    # only object_story_spec is dropped; the other spec fields are still synced
+    assert calls[1] == calls[0] - {DOF_MISMATCH_FIELD}
+    assert {"asset_feed_spec", "degrees_of_freedom_spec"} <= calls[1]
     # the next creative goes back to requesting every field
-    assert DOF_SPEC_FIELDS <= requested_fields(stream)
+    assert DOF_MISMATCH_FIELD in requested_fields(stream)
 
 
 def test_get_records_skips_creative_when_retry_also_fails(monkeypatch):
@@ -75,7 +76,7 @@ def test_get_records_skips_creative_when_retry_also_fails(monkeypatch):
     monkeypatch.setattr("tap_facebook.client.FacebookStream.get_records", fake_get_records)
 
     assert list(stream.get_records(creative_context())) == []
-    assert DOF_SPEC_FIELDS <= requested_fields(stream)
+    assert DOF_MISMATCH_FIELD in requested_fields(stream)
 
 
 def test_get_records_skips_creative_on_other_client_errors(monkeypatch):
