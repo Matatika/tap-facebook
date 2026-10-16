@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import typing as t
 
+from singer_sdk.exceptions import FatalAPIError
 from singer_sdk.typing import (
     BooleanType,
     IntegerType,
@@ -18,6 +19,11 @@ from tap_facebook.streams.ads import AdsStream
 if t.TYPE_CHECKING:
     import requests
 
+# Facebook rejects reads of object_story_spec on some Advantage+ (degrees-of-freedom)
+# creatives whose asset_feed_spec no longer matches it. Every other field, including
+# asset_feed_spec and degrees_of_freedom_spec, can still be read, so we retry without it.
+DOF_MISMATCH_SUBCODE = "2446211"
+DOF_MISMATCH_FIELD = "object_story_spec"
 
 
 class CreativeStream(FacebookStream):
@@ -205,6 +211,10 @@ class CreativeStream(FacebookStream):
         Property("carousel_ad_link", StringType),
     ).to_dict()
 
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        super().__init__(*args, **kwargs)
+        self._exclude_object_story_spec = False
+
     @property
     def partitions(self) -> list[dict[str, t.Any]]:
         return [{"_current_account_id": account_id} for account_id in self.config["account_ids"]]
@@ -219,8 +229,11 @@ class CreativeStream(FacebookStream):
         next_page_token: str | None = None,
     ) -> dict[str, str]:
         """Return query parameters for the request."""
+        columns = self.columns
+        if self._exclude_object_story_spec:
+            columns = [column for column in columns if column != DOF_MISMATCH_FIELD]
         params = {
-            "fields": ",".join(self.columns),
+            "fields": ",".join(columns),
         }
         if next_page_token:
             params["after"] = next_page_token
@@ -237,4 +250,23 @@ class CreativeStream(FacebookStream):
     def get_records(self, context: dict | None) -> t.Iterable[dict]:
         if not context or context.get("_child_type") != "creative":
             return []
-        yield from super().get_records(context)
+        try:
+            yield from super().get_records(context)
+        except FatalAPIError as e:
+            if DOF_MISMATCH_SUBCODE not in str(e):
+                self.logger.warning("Skipping creative %s: %s", context["creative_id"], e)
+                return
+            self.logger.warning(
+                "Creative %s has mismatched degrees-of-freedom specs; retrying without %s",
+                context["creative_id"],
+                DOF_MISMATCH_FIELD,
+            )
+            self._exclude_object_story_spec = True
+            try:
+                yield from super().get_records(context)
+            except FatalAPIError as retry_error:
+                self.logger.warning(
+                    "Skipping creative %s: %s", context["creative_id"], retry_error
+                )
+            finally:
+                self._exclude_object_story_spec = False
